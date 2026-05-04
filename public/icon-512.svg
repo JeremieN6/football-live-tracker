@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Match Report AI icon 512">
+  <rect width="512" height="512" rx="74" fill="#0a0a0a" />
+  <g stroke="#22c55e" stroke-width="14" opacity="0.5">
+    <path d="M64 256h384" />
+    <path d="M256 64v384" />
+  </g>
+  <circle cx="256" cy="256" r="92" fill="#16a34a" />
+  <path d="M190 240h132v32H190z" fill="#e5e7eb" />
+</svg>

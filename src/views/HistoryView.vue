@@ -99,7 +99,7 @@ const hasFilteredMatches = computed(() => filteredMatches.value.length > 0)
             class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
             @click="router.push({ name: 'club' })"
           >
-            Mon club
+            {{ clubsStore.club?.name ?? 'Mon club' }}
           </button>
           <button
             class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"

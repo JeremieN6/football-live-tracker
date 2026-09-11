@@ -102,7 +102,7 @@ async function handleRemove(id: string) {
           <path d="m15 18-6-6 6-6" />
         </svg>
       </button>
-      <h1 class="text-sm font-semibold text-white">Membres du club</h1>
+      <h1 class="text-sm font-semibold text-white">Membres de {{ clubsStore.club?.name ?? 'votre club' }}</h1>
     </div>
 
     <div class="px-4 pt-5 max-w-2xl mx-auto">

@@ -10,6 +10,8 @@ function rowToTeam(row: Record<string, unknown>): ClubTeam {
     clubId: row.club_id as string,
     name: row.name as string,
     division: row.division as string | null,
+    category: row.category as string | null,
+    formation: row.formation as string | null,
     createdAt: row.created_at as string,
   }
 }
@@ -37,10 +39,23 @@ export const useTeamsStore = defineStore('teams', () => {
     }
   }
 
-  async function createTeam(clubId: string, payload: { name: string; division: string | null }): Promise<ClubTeam> {
+  interface TeamPayload {
+    name: string
+    division: string | null
+    category: string | null
+    formation: string | null
+  }
+
+  async function createTeam(clubId: string, payload: TeamPayload): Promise<ClubTeam> {
     const { data, error: sbError } = await supabase
       .from('teams')
-      .insert({ club_id: clubId, name: payload.name, division: payload.division })
+      .insert({
+        club_id: clubId,
+        name: payload.name,
+        division: payload.division,
+        category: payload.category,
+        formation: payload.formation,
+      })
       .select()
       .single()
     if (sbError) throw sbError
@@ -49,10 +64,15 @@ export const useTeamsStore = defineStore('teams', () => {
     return team
   }
 
-  async function updateTeam(id: string, payload: { name: string; division: string | null }) {
+  async function updateTeam(id: string, payload: TeamPayload) {
     const { error: sbError } = await supabase
       .from('teams')
-      .update({ name: payload.name, division: payload.division })
+      .update({
+        name: payload.name,
+        division: payload.division,
+        category: payload.category,
+        formation: payload.formation,
+      })
       .eq('id', id)
     if (sbError) throw sbError
     const idx = teams.value.findIndex((t) => t.id === id)

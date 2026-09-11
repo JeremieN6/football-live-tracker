@@ -34,6 +34,12 @@ onMounted(async () => {
   }
 })
 
+// Un coach non-propriétaire ne peut rattacher un joueur qu'à sa propre équipe
+const selectableTeams = computed(() => {
+  if (clubsStore.isOwner) return teamsStore.teams
+  return teamsStore.teams.filter((t) => clubsStore.membership?.teamIds.includes(t.id))
+})
+
 // Postes existants dans l'effectif, pour peupler le filtre
 const positions = computed(() => {
   const set = new Set(playersStore.players.map((p) => p.position).filter((p): p is string => !!p))
@@ -143,6 +149,7 @@ async function toggleActive(id: string, active: boolean) {
 
       <!-- Bouton d'ouverture du formulaire -->
       <button
+        v-if="clubsStore.canWrite"
         class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
                hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
         @click="showForm = true"
@@ -234,12 +241,14 @@ async function toggleActive(id: string, active: boolean) {
             </div>
           </button>
           <button
+            v-if="clubsStore.canWrite"
             class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
             @click="startEdit(player.id)"
           >
             Modifier
           </button>
           <button
+            v-if="clubsStore.canWrite"
             class="text-xs px-2 py-1 rounded-md transition-colors"
             :class="player.active ? 'text-red-400 hover:bg-red-500/10' : 'text-green-400 hover:bg-green-500/10'"
             @click="toggleActive(player.id, player.active)"
@@ -314,8 +323,8 @@ async function toggleActive(id: string, active: boolean) {
               class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
                      text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
             >
-              <option :value="null">Sans équipe</option>
-              <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">
+              <option v-if="clubsStore.isOwner" :value="null">Sans équipe</option>
+              <option v-for="t in selectableTeams" :key="t.id" :value="t.id">
                 {{ t.name }}<span v-if="t.division"> · {{ t.division }}</span>
               </option>
             </select>

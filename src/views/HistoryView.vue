@@ -3,17 +3,29 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMatchStore } from '@/stores/match.store'
 import { useAuthStore } from '@/stores/auth.store'
+import { useClubsStore } from '@/stores/clubs.store'
+import { useTeamsStore } from '@/stores/teams.store'
 import CreateMatchModal from '@/components/tracker/CreateMatchModal.vue'
 
 const router = useRouter()
 const matchStore = useMatchStore()
 const authStore = useAuthStore()
+const clubsStore = useClubsStore()
+const teamsStore = useTeamsStore()
 
 const showCreateModal = ref(false)
+const filterTeamId = ref<string | 'ALL'>('ALL')
 
-onMounted(() => {
+onMounted(async () => {
   matchStore.fetchMatches()
+  const club = await clubsStore.ensureClub().catch(() => null)
+  if (club) await teamsStore.fetchTeams(club.id)
 })
+
+function teamName(id: string | null): string {
+  if (!id) return 'Sans équipe'
+  return teamsStore.teams.find((t) => t.id === id)?.name ?? 'Équipe inconnue'
+}
 
 // Formate la date en "1 mai 2026"
 function formatDate(dateStr: string): string {
@@ -44,7 +56,13 @@ async function handleSignOut() {
   router.push({ name: 'auth' })
 }
 
+const filteredMatches = computed(() => {
+  if (filterTeamId.value === 'ALL') return matchStore.matches
+  return matchStore.matches.filter((m) => m.teamId === filterTeamId.value)
+})
+
 const hasMatches = computed(() => matchStore.matches.length > 0)
+const hasFilteredMatches = computed(() => filteredMatches.value.length > 0)
 </script>
 
 <template>
@@ -60,7 +78,13 @@ const hasMatches = computed(() => matchStore.matches.length > 0)
           </svg>
           <span class="font-semibold text-sm">Match Report AI</span>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-4 flex-wrap justify-end">
+          <button
+            class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
+            @click="router.push({ name: 'members' })"
+          >
+            Membres
+          </button>
           <button
             class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
             @click="router.push({ name: 'teams' })"
@@ -87,9 +111,10 @@ const hasMatches = computed(() => matchStore.matches.length > 0)
     <main class="max-w-2xl mx-auto px-4 py-8">
 
       <!-- Titre + bouton nouveau match -->
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-xl font-semibold">Historique</h1>
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-xl font-semibold">Matchs</h1>
         <button
+          v-if="clubsStore.canWrite"
           class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-white text-neutral-900 text-sm font-semibold
                  hover:bg-neutral-100 transition-all"
           @click="showCreateModal = true"
@@ -99,6 +124,18 @@ const hasMatches = computed(() => matchStore.matches.length > 0)
           </svg>
           Nouveau match
         </button>
+      </div>
+
+      <!-- Filtre par équipe (utile dès qu'il y a plus d'une équipe) -->
+      <div v-if="teamsStore.teams.length > 1" class="mb-6">
+        <select
+          v-model="filterTeamId"
+          class="w-full sm:w-auto h-9 px-3 rounded-lg bg-white/5 border border-white/10 text-white
+                 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
+        >
+          <option value="ALL">Toutes les équipes</option>
+          <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">{{ t.name }}</option>
+        </select>
       </div>
 
       <!-- État de chargement -->
@@ -112,9 +149,9 @@ const hasMatches = computed(() => matchStore.matches.length > 0)
       </p>
 
       <!-- Liste des matchs -->
-      <div v-else-if="hasMatches" class="space-y-3">
+      <div v-else-if="hasFilteredMatches" class="space-y-3">
         <div
-          v-for="match in matchStore.matches"
+          v-for="match in filteredMatches"
           :key="match.id"
           class="group bg-white/5 border border-white/10 rounded-xl px-4 py-4 hover:bg-white/8 hover:border-white/20 transition-all cursor-pointer"
           @click="match.status === 'FINISHED' ? goToReport(match.id) : goToTracker(match.id)"
@@ -135,6 +172,8 @@ const hasMatches = computed(() => matchStore.matches.length > 0)
                 <span class="font-semibold text-sm truncate">{{ match.awayTeam }}</span>
               </div>
               <div class="flex items-center gap-2 mt-1.5">
+                <span class="text-xs text-violet-400 font-medium">{{ teamName(match.teamId) }}</span>
+                <span class="text-neutral-700">·</span>
                 <span class="text-xs text-neutral-500">{{ formatDate(match.date) }}</span>
                 <span v-if="match.competition" class="text-neutral-700">·</span>
                 <span v-if="match.competition" class="text-xs text-neutral-500 truncate">{{ match.competition }}</span>
@@ -154,6 +193,11 @@ const hasMatches = computed(() => matchStore.matches.length > 0)
         </div>
       </div>
 
+      <!-- Aucun résultat pour le filtre actif -->
+      <p v-else-if="hasMatches" class="text-sm text-neutral-600 text-center py-8">
+        Aucun match pour cette équipe.
+      </p>
+
       <!-- État vide -->
       <div v-else class="text-center py-20">
         <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/5 mb-4">
@@ -163,8 +207,11 @@ const hasMatches = computed(() => matchStore.matches.length > 0)
           </svg>
         </div>
         <p class="text-neutral-400 font-medium mb-1">Aucun match pour l'instant</p>
-        <p class="text-sm text-neutral-600 mb-6">Créez votre premier match pour commencer l'analyse.</p>
+        <p class="text-sm text-neutral-600 mb-6">
+          {{ clubsStore.canWrite ? 'Créez votre premier match pour commencer l\'analyse.' : 'Aucun match créé pour le moment.' }}
+        </p>
         <button
+          v-if="clubsStore.canWrite"
           class="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-white text-neutral-900 text-sm font-semibold
                  hover:bg-neutral-100 transition-all"
           @click="showCreateModal = true"

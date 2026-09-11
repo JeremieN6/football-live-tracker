@@ -29,15 +29,26 @@ onMounted(async () => {
   }
 })
 
-// Nombre de joueurs actifs par équipe, calculé depuis l'effectif (pas stocké)
-const playerCount = computed(() => {
-  const counts = new Map<string, number>()
+// Joueurs actifs par équipe, calculé depuis l'effectif (pas stocké)
+const playersByTeam = computed(() => {
+  const map = new Map<string, typeof playersStore.players>()
   for (const p of playersStore.players) {
     if (!p.active || !p.teamId) continue
-    counts.set(p.teamId, (counts.get(p.teamId) ?? 0) + 1)
+    const list = map.get(p.teamId) ?? []
+    list.push(p)
+    map.set(p.teamId, list)
   }
-  return counts
+  return map
 })
+
+function teamPlayers(teamId: string) {
+  return playersByTeam.value.get(teamId) ?? []
+}
+
+const expandedTeamId = ref<string | null>(null)
+function toggleRoster(teamId: string) {
+  expandedTeamId.value = expandedTeamId.value === teamId ? null : teamId
+}
 
 function startEdit(id: string) {
   const team = teamsStore.teams.find((t) => t.id === id)
@@ -108,8 +119,9 @@ async function handleDelete(id: string) {
 
     <div class="px-4 pt-5 max-w-2xl mx-auto">
 
-      <!-- Bouton d'ouverture du formulaire -->
+      <!-- Bouton d'ouverture du formulaire (propriétaire uniquement) -->
       <button
+        v-if="clubsStore.isOwner"
         class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
                hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
         @click="showForm = true"
@@ -148,23 +160,47 @@ async function handleDelete(id: string) {
               <p v-if="team.division" class="text-xs text-neutral-500">{{ team.division }}</p>
             </div>
             <button
+              v-if="clubsStore.isOwner"
               class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
               @click="startEdit(team.id)"
             >
               Modifier
             </button>
             <button
+              v-if="clubsStore.isOwner"
               class="text-xs text-red-400 hover:bg-red-500/10 px-2 py-1 rounded-md transition-colors"
               @click="handleDelete(team.id)"
             >
               Supprimer
             </button>
           </div>
-          <div class="flex items-center gap-3 mt-2 pt-2 border-t border-white/5">
+          <button
+            type="button"
+            class="w-full flex items-center gap-3 mt-2 pt-2 border-t border-white/5 text-left"
+            @click="toggleRoster(team.id)"
+          >
             <span class="text-xs text-neutral-400">
-              👤 {{ playerCount.get(team.id) ?? 0 }} joueur{{ (playerCount.get(team.id) ?? 0) > 1 ? 's' : '' }}
+              👤 {{ teamPlayers(team.id).length }} joueur{{ teamPlayers(team.id).length > 1 ? 's' : '' }}
             </span>
             <span v-if="team.formation" class="text-xs text-neutral-400">⚽ {{ team.formation }}</span>
+            <span class="text-xs text-neutral-600 ml-auto">
+              {{ expandedTeamId === team.id ? 'Masquer ▲' : 'Voir l\'effectif ▼' }}
+            </span>
+          </button>
+
+          <div v-if="expandedTeamId === team.id" class="mt-2 pt-2 border-t border-white/5">
+            <p v-if="teamPlayers(team.id).length === 0" class="text-xs text-neutral-600">
+              Aucun joueur assigné à cette équipe pour le moment.
+            </p>
+            <div v-else class="flex flex-wrap gap-1.5">
+              <span
+                v-for="p in teamPlayers(team.id)"
+                :key="p.id"
+                class="text-xs text-neutral-300 bg-white/5 border border-white/10 rounded-full px-2.5 py-1"
+              >
+                {{ p.name }}<span v-if="p.position" class="text-neutral-500"> · {{ p.position }}</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>

@@ -19,6 +19,8 @@ const teamId = ref<string | null>(null)
 const editingId = ref<string | null>(null)
 const showArchived = ref(false)
 const filterTeamId = ref<string | 'ALL'>('ALL')
+const filterPosition = ref<string | 'ALL'>('ALL')
+const searchQuery = ref('')
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -31,9 +33,18 @@ onMounted(async () => {
   }
 })
 
+// Postes existants dans l'effectif, pour peupler le filtre
+const positions = computed(() => {
+  const set = new Set(playersStore.players.map((p) => p.position).filter((p): p is string => !!p))
+  return [...set].sort((a, b) => a.localeCompare(b))
+})
+
 const visiblePlayers = computed(() => {
   let list = playersStore.players.filter((p) => showArchived.value || p.active)
   if (filterTeamId.value !== 'ALL') list = list.filter((p) => p.teamId === filterTeamId.value)
+  if (filterPosition.value !== 'ALL') list = list.filter((p) => p.position === filterPosition.value)
+  const query = searchQuery.value.trim().toLowerCase()
+  if (query) list = list.filter((p) => p.name.toLowerCase().includes(query))
   // Trie par équipe (ordre de création des équipes), puis par numéro
   const teamOrder = new Map(teamsStore.teams.map((t, i) => [t.id, i]))
   return [...list].sort((a, b) => {
@@ -211,12 +222,27 @@ async function toggleActive(id: string, active: boolean) {
         </div>
       </form>
 
+      <!-- Recherche -->
+      <div class="relative mb-3">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Rechercher un joueur par nom..."
+          class="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
+                 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+        />
+      </div>
+
       <!-- Filtres -->
-      <div class="flex items-center justify-between mb-3 gap-2">
+      <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
           Joueurs ({{ visiblePlayers.length }})
         </h2>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <select
             v-model="filterTeamId"
             class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
@@ -224,6 +250,15 @@ async function toggleActive(id: string, active: boolean) {
           >
             <option value="ALL">Toutes les équipes</option>
             <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">{{ t.name }}</option>
+          </select>
+          <select
+            v-if="positions.length > 0"
+            v-model="filterPosition"
+            class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
+                   focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
+          >
+            <option value="ALL">Tous les postes</option>
+            <option v-for="pos in positions" :key="pos" :value="pos">{{ pos }}</option>
           </select>
           <button
             class="text-xs text-neutral-600 hover:text-neutral-400 transition-colors whitespace-nowrap"
@@ -238,8 +273,12 @@ async function toggleActive(id: string, active: boolean) {
         <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
       </div>
 
-      <p v-else-if="visiblePlayers.length === 0" class="text-sm text-neutral-600 text-center py-8">
+      <p v-else-if="visiblePlayers.length === 0 && playersStore.players.length === 0" class="text-sm text-neutral-600 text-center py-8">
         Aucun joueur pour le moment. Ajoutez votre effectif ci-dessus.
+      </p>
+
+      <p v-else-if="visiblePlayers.length === 0" class="text-sm text-neutral-600 text-center py-8">
+        Aucun joueur ne correspond à cette recherche.
       </p>
 
       <div v-else class="space-y-1.5">

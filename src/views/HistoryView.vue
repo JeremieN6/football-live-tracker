@@ -5,6 +5,7 @@ import { useMatchStore } from '@/stores/match.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
+import { useAdminClubsStore } from '@/stores/adminClubs.store'
 import CreateMatchModal from '@/components/tracker/CreateMatchModal.vue'
 
 const router = useRouter()
@@ -12,6 +13,7 @@ const matchStore = useMatchStore()
 const authStore = useAuthStore()
 const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
+const adminStore = useAdminClubsStore()
 
 const showCreateModal = ref(false)
 const filterTeamId = ref<string | 'ALL'>('ALL')
@@ -20,6 +22,7 @@ onMounted(async () => {
   matchStore.fetchMatches()
   const club = await clubsStore.ensureClub().catch(() => null)
   if (club) await teamsStore.fetchTeams(club.id)
+  adminStore.checkAdmin().catch(() => {})
 })
 
 function teamName(id: string | null): string {
@@ -79,6 +82,13 @@ const hasFilteredMatches = computed(() => filteredMatches.value.length > 0)
           <span class="font-semibold text-sm">NRV</span>
         </div>
         <div class="flex items-center gap-4 flex-wrap justify-end">
+          <button
+            v-if="adminStore.isAdmin"
+            class="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+            @click="router.push({ name: 'admin-clubs' })"
+          >
+            Admin
+          </button>
           <button
             class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
             @click="router.push({ name: 'members' })"

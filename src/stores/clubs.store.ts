@@ -4,7 +4,7 @@ import { supabase } from '@/services/supabase'
 import type { Club } from '@/types/match.types'
 import { extractErrorMessage } from '@/lib/errors'
 
-function rowToClub(row: Record<string, unknown>): Club {
+export function rowToClub(row: Record<string, unknown>): Club {
   return {
     id: row.id as string,
     name: row.name as string,
@@ -19,6 +19,16 @@ export type MemberRole = 'OWNER' | 'COACH' | 'PLAYER' | 'OTHER'
 export interface Membership {
   role: MemberRole
   teamIds: string[]
+}
+
+// Levée par ensureClub() quand l'utilisateur n'a ni club, ni invitation en
+// attente : il doit passer par /create-club et choisir un nom avant qu'un
+// club soit créé (jamais de création automatique avec un nom générique).
+export class ClubNotFoundError extends Error {
+  constructor() {
+    super('Aucun club trouvé pour cet utilisateur.')
+    this.name = 'ClubNotFoundError'
+  }
 }
 
 export const useClubsStore = defineStore('clubs', () => {
@@ -104,10 +114,32 @@ export const useClubsStore = defineStore('clubs', () => {
         return club.value
       }
 
-      // Aucun club, aucune invitation acceptée : premier login, on en crée un avec une équipe par défaut
+      // Aucun club, aucune invitation acceptée : l'utilisateur doit en créer
+      // un explicitement (avec un vrai nom) via /create-club, jamais automatiquement.
+      throw new ClubNotFoundError()
+    } catch (err: unknown) {
+      if (!(err instanceof ClubNotFoundError)) {
+        error.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
+      }
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Crée le club de l'utilisateur avec le nom qu'il a choisi (première connexion,
+  // aucune invitation en attente) : club en status PENDING (validation admin requise,
+  // voir clubs.status), équipe par défaut, et le crée comme OWNER.
+  async function createClub(name: string): Promise<Club> {
+    loading.value = true
+    error.value = null
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) throw new Error('Non authentifié.')
+
       const { data: newClub, error: createError } = await supabase
         .from('clubs')
-        .insert({ name: 'Mon club', owner_id: userData.user.id })
+        .insert({ name, owner_id: userData.user.id })
         .select()
         .single()
       if (createError) throw createError
@@ -126,7 +158,7 @@ export const useClubsStore = defineStore('clubs', () => {
       membership.value = { role: 'OWNER', teamIds: [] }
       return club.value
     } catch (err: unknown) {
-      error.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
+      error.value = extractErrorMessage(err, 'Erreur lors de la création du club.')
       throw err
     } finally {
       loading.value = false
@@ -146,5 +178,5 @@ export const useClubsStore = defineStore('clubs', () => {
     error.value = null
   }
 
-  return { club, membership, isOwner, canWrite, loading, error, ensureClub, renameClub, reset }
+  return { club, membership, isOwner, canWrite, loading, error, ensureClub, createClub, renameClub, reset }
 })

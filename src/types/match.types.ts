@@ -46,8 +46,35 @@ export interface MatchEvent {
   pitchY: number | null
   zoneX: ZoneX | null
   zoneY: ZoneY | null
-  playerIn: string | null
-  playerOut: string | null
+  // Buteur / passeur décisif (GOAL_FOR)
+  scorerId: string | null
+  assistId: string | null
+  // Joueur sanctionné (YELLOW_CARD / RED_CARD)
+  playerId: string | null
+  // Remplacement (SUBSTITUTION)
+  playerInId: string | null
+  playerOutId: string | null
+  createdBy: string
+  createdAt: string
+}
+
+export interface Player {
+  id: string
+  name: string
+  number: number | null
+  position: string | null
+  active: boolean
+  createdBy: string
+  createdAt: string
+}
+
+export type LineupRole = 'STARTER' | 'SUB'
+
+export interface LineupEntry {
+  id: string
+  matchId: string
+  playerId: string
+  role: LineupRole
   createdBy: string
   createdAt: string
 }

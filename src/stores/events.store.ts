@@ -17,8 +17,11 @@ function rowToEvent(row: Record<string, unknown>): MatchEvent {
     pitchY: row.pitch_y as number | null,
     zoneX: row.zone_x as ZoneX | null,
     zoneY: row.zone_y as ZoneY | null,
-    playerIn: row.player_in as string | null,
-    playerOut: row.player_out as string | null,
+    scorerId: row.scorer_id as string | null,
+    assistId: row.assist_id as string | null,
+    playerId: row.player_id as string | null,
+    playerInId: row.player_in_id as string | null,
+    playerOutId: row.player_out_id as string | null,
     createdBy: row.created_by as string,
     createdAt: row.created_at as string,
   }
@@ -76,8 +79,11 @@ export const useEventsStore = defineStore('events', () => {
       pitch_y: event.pitchY,
       zone_x: event.zoneX,
       zone_y: event.zoneY,
-      player_in: event.playerIn,
-      player_out: event.playerOut,
+      scorer_id: event.scorerId,
+      assist_id: event.assistId,
+      player_id: event.playerId,
+      player_in_id: event.playerInId,
+      player_out_id: event.playerOutId,
       created_by: userData.user.id,
     })
 

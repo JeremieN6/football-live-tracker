@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import type { Player } from '@/types/match.types'
 
 const props = defineProps<{
@@ -8,39 +8,36 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  confirm: [{ playerInId: string; playerOutId: string }]
+  confirm: [{ scorerId: string | null; assistId: string | null }]
   cancel: []
 }>()
 
-const playerInId = ref<string | null>(null)
-const playerOutId = ref<string | null>(null)
-
-const canConfirm = computed(
-  () => !!playerInId.value && !!playerOutId.value && playerInId.value !== playerOutId.value,
-)
+const scorerId = ref<string | null>(null)
+const assistId = ref<string | null>(null)
 
 function playerLabel(p: Player): string {
   return p.number != null ? `#${p.number} ${p.name}` : p.name
 }
 
 function handleConfirm() {
-  if (!canConfirm.value) return
-  emit('confirm', { playerInId: playerInId.value!, playerOutId: playerOutId.value! })
+  emit('confirm', { scorerId: scorerId.value, assistId: assistId.value })
+}
+
+function handleSkip() {
+  emit('confirm', { scorerId: null, assistId: null })
 }
 </script>
 
 <template>
-  <!-- Overlay -->
   <div
     class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
     @click.self="emit('cancel')"
   >
     <div class="w-full max-w-sm bg-neutral-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
 
-      <!-- Header -->
       <div class="flex items-center justify-between mb-5">
         <div>
-          <h2 class="text-base font-semibold text-white">Remplacement</h2>
+          <h2 class="text-base font-semibold text-white">⚽ But</h2>
           <p class="text-xs text-neutral-500 mt-0.5">Minute {{ props.minute }}'</p>
         </div>
         <button class="text-neutral-500 hover:text-white transition-colors p-1" @click="emit('cancel')">
@@ -50,58 +47,44 @@ function handleConfirm() {
         </button>
       </div>
 
-      <!-- Pas d'effectif sélectionné pour ce match -->
-      <p v-if="props.players.length === 0" class="text-sm text-neutral-400 bg-white/5 border border-white/10 rounded-lg px-3 py-3">
-        Aucun effectif sélectionné pour ce match. Renseignez d'abord les titulaires et remplaçants pour saisir un remplacement nominatif.
-      </p>
-
-      <!-- Champs -->
-      <div v-else class="space-y-4">
+      <div class="space-y-4">
         <div class="space-y-1">
-          <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">
-            🟢 Joueur qui entre
-          </label>
+          <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Buteur</label>
           <select
-            v-model="playerInId"
+            v-model="scorerId"
             class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
                    text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
           >
-            <option :value="null" disabled>Sélectionner...</option>
-            <option v-for="p in props.players" :key="p.id" :value="p.id" :disabled="p.id === playerOutId">
-              {{ playerLabel(p) }}
-            </option>
+            <option :value="null">Non précisé</option>
+            <option v-for="p in props.players" :key="p.id" :value="p.id">{{ playerLabel(p) }}</option>
           </select>
         </div>
         <div class="space-y-1">
-          <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">
-            🔴 Joueur qui sort
-          </label>
+          <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Passe décisive (optionnel)</label>
           <select
-            v-model="playerOutId"
+            v-model="assistId"
             class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
                    text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
           >
-            <option :value="null" disabled>Sélectionner...</option>
-            <option v-for="p in props.players" :key="p.id" :value="p.id" :disabled="p.id === playerInId">
+            <option :value="null">Aucune / non précisée</option>
+            <option v-for="p in props.players" :key="p.id" :value="p.id" :disabled="p.id === scorerId">
               {{ playerLabel(p) }}
             </option>
           </select>
         </div>
       </div>
 
-      <!-- Actions -->
       <div class="flex gap-3 mt-5">
         <button
           class="flex-1 h-11 rounded-lg border border-white/10 text-neutral-400 text-sm font-medium
                  hover:border-white/20 hover:text-white transition-all"
-          @click="emit('cancel')"
+          @click="handleSkip"
         >
-          Annuler
+          Passer
         </button>
         <button
-          :disabled="!canConfirm"
           class="flex-1 h-11 rounded-lg bg-white text-neutral-900 text-sm font-semibold
-                 hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                 hover:bg-neutral-100 transition-all"
           @click="handleConfirm"
         >
           Confirmer

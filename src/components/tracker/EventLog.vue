@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { MatchEvent } from '@/types/match.types'
+import type { MatchEvent, Player } from '@/types/match.types'
 
 const props = defineProps<{
   events: MatchEvent[]
+  players?: Player[]
 }>()
+
+function playerName(id: string | null): string | null {
+  if (!id) return null
+  const player = props.players?.find((p) => p.id === id)
+  return player ? player.name : null
+}
 
 const emit = defineEmits<{
   delete: [id: string]
@@ -61,8 +68,23 @@ function dotColor(type: string): string {
 }
 
 function label(event: MatchEvent): string {
-  if (event.type === 'SUBSTITUTION' && event.playerIn && event.playerOut) {
-    return `🔄 ${event.playerIn} ↔ ${event.playerOut}`
+  if (event.type === 'SUBSTITUTION') {
+    const playerIn = playerName(event.playerInId)
+    const playerOut = playerName(event.playerOutId)
+    if (playerIn && playerOut) return `🔄 ${playerIn} ↔ ${playerOut}`
+    return eventLabels[event.type]
+  }
+  if (event.type === 'GOAL_FOR') {
+    const scorer = playerName(event.scorerId)
+    const assist = playerName(event.assistId)
+    if (scorer && assist) return `⚽ But — ${scorer} (passe : ${assist})`
+    if (scorer) return `⚽ But — ${scorer}`
+    return eventLabels[event.type]
+  }
+  if (event.type === 'YELLOW_CARD' || event.type === 'RED_CARD') {
+    const player = playerName(event.playerId)
+    if (player) return `${eventLabels[event.type]} — ${player}`
+    return eventLabels[event.type]
   }
   return eventLabels[event.type] ?? event.type
 }

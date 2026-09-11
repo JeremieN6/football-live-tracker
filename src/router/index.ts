@@ -18,6 +18,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/roster',
+    name: 'roster',
+    component: () => import('@/views/RosterView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/match/:id/lineup',
+    name: 'lineup',
+    component: () => import('@/views/LineupView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/match/:id',
     name: 'tracker',
     component: () => import('@/views/TrackerView.vue'),

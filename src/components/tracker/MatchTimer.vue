@@ -9,6 +9,7 @@ const props = defineProps<{
   scoreAway: number
   homeTeam: string
   awayTeam: string
+  canControl?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -53,7 +54,7 @@ const emit = defineEmits<{
         </span>
 
         <!-- Boutons de contrôle -->
-        <div class="flex items-center gap-1.5">
+        <div v-if="props.canControl !== false" class="flex items-center gap-1.5">
           <!-- Start / Pause -->
           <button
             v-if="!props.running"

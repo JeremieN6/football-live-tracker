@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { useMatchStore } from '@/stores/match.store'
 import { useEventsStore } from '@/stores/events.store'
 import { useAuthStore } from '@/stores/auth.store'
+import { useClubsStore } from '@/stores/clubs.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useLineupStore } from '@/stores/lineup.store'
 import { useTimer } from '@/composables/useTimer'
@@ -24,6 +25,7 @@ const router = useRouter()
 const matchStore = useMatchStore()
 const eventsStore = useEventsStore()
 const authStore = useAuthStore()
+const clubsStore = useClubsStore()
 const playersStore = usePlayersStore()
 const lineupStore = useLineupStore()
 const timer = useTimer()
@@ -71,8 +73,8 @@ onMounted(async () => {
     playersStore.fetchPlayers(),
     lineupStore.fetchLineup(matchId),
   ])
-  // Passe le match en LIVE si PENDING
-  if (matchStore.currentMatch?.status === 'PENDING') {
+  // Passe le match en LIVE si PENDING (uniquement si on a le droit d'écrire sur ce match)
+  if (clubsStore.canWrite && matchStore.currentMatch?.status === 'PENDING') {
     await matchStore.updateMatchStatus(matchId, 'LIVE')
   }
   // Démarrer la synchronisation Realtime
@@ -222,6 +224,7 @@ async function handleFinishMatch() {
       :score-away="scoreAway"
       :home-team="matchStore.currentMatch?.homeTeam ?? ''"
       :away-team="matchStore.currentMatch?.awayTeam ?? ''"
+      :can-control="clubsStore.canWrite"
       @start="timer.start()"
       @pause="timer.pause()"
       @switch-half="handleSwitchHalf"
@@ -244,7 +247,7 @@ async function handleFinishMatch() {
       </div>
 
       <!-- Instruction contextuelle -->
-      <div class="px-4 mb-3 h-8 flex items-center">
+      <div v-if="clubsStore.canWrite" class="px-4 mb-3 h-8 flex items-center">
         <p v-if="selectedAction" class="text-sm text-amber-400 font-medium animate-pulse">
           Touchez le terrain pour placer l'action
         </p>
@@ -252,9 +255,15 @@ async function handleFinishMatch() {
           Sélectionnez une action ci-dessous
         </p>
       </div>
+      <div v-else class="px-4 mb-3">
+        <p class="text-xs text-neutral-600 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+          Lecture seule — vous n'avez pas les droits pour saisir des événements sur ce match.
+        </p>
+      </div>
 
       <!-- Boutons d'action -->
       <ActionButtons
+        v-if="clubsStore.canWrite"
         :selected-action="selectedAction"
         @select="handleActionSelect"
         @deselect="handleActionDeselect"
@@ -275,11 +284,12 @@ async function handleFinishMatch() {
       <EventLog
         :events="eventsStore.events"
         :players="lineupPlayers"
+        :read-only="!clubsStore.canWrite"
         @delete="handleDeleteEvent"
       />
 
       <!-- Bouton terminer le match -->
-      <div class="px-4 mt-6">
+      <div v-if="clubsStore.canWrite" class="px-4 mt-6">
         <button
           class="w-full h-12 rounded-xl border border-white/10 text-neutral-400 text-sm font-medium
                  hover:border-red-500/30 hover:text-red-400 hover:bg-red-500/10 transition-all"

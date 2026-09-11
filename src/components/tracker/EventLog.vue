@@ -5,6 +5,7 @@ import type { MatchEvent, Player } from '@/types/match.types'
 const props = defineProps<{
   events: MatchEvent[]
   players?: Player[]
+  readOnly?: boolean
 }>()
 
 function playerName(id: string | null): string | null {
@@ -21,6 +22,7 @@ const emit = defineEmits<{
 const selectedId = ref<string | null>(null)
 
 function toggleSelect(id: string) {
+  if (props.readOnly) return
   selectedId.value = selectedId.value === id ? null : id
 }
 

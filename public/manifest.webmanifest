@@ -1,6 +1,6 @@
 {
-  "name": "Match Report AI",
-  "short_name": "MatchReport",
+  "name": "NRV",
+  "short_name": "NRV",
   "description": "Live tracking football et rapport tactique IA pour coachs amateurs.",
   "start_url": "/",
   "display": "standalone",

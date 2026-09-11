@@ -72,7 +72,7 @@ function toggleMode() {
             <path d="M12 2a10 10 0 0 1 0 20M2 12h20M12 2c-2.5 3-4 6.3-4 10s1.5 7 4 10M12 2c2.5 3 4 6.3 4 10s-1.5 7-4 10" />
           </svg>
         </div>
-        <h1 class="text-2xl font-semibold text-white tracking-tight">Match Report AI</h1>
+        <h1 class="text-2xl font-semibold text-white tracking-tight">NRV</h1>
         <p class="text-sm text-neutral-400 mt-1">
           {{ mode === 'login' ? 'Connectez-vous à votre compte' : 'Créez votre compte' }}
         </p>

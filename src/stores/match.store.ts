@@ -16,6 +16,8 @@ function rowToMatch(row: Record<string, unknown>): Match {
     scoreAway: row.score_away as number,
     firstHalfMinutes: row.first_half_minutes as number | null,
     secondHalfMinutes: row.second_half_minutes as number | null,
+    clubId: row.club_id as string | null,
+    teamId: row.team_id as string | null,
     createdBy: row.created_by as string,
   }
 }
@@ -73,6 +75,8 @@ export const useMatchStore = defineStore('match', () => {
     awayTeam: string
     competition: string
     date: string
+    clubId: string
+    teamId: string | null
   }): Promise<Match> {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) throw new Error('Non authentifié.')
@@ -84,6 +88,8 @@ export const useMatchStore = defineStore('match', () => {
         away_team: payload.awayTeam,
         competition: payload.competition,
         date: payload.date,
+        club_id: payload.clubId,
+        team_id: payload.teamId,
         created_by: userData.user.id,
       })
       .select()

@@ -2,26 +2,47 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayersStore } from '@/stores/players.store'
+import { useClubsStore } from '@/stores/clubs.store'
+import { useTeamsStore } from '@/stores/teams.store'
 
 const router = useRouter()
 const playersStore = usePlayersStore()
+const clubsStore = useClubsStore()
+const teamsStore = useTeamsStore()
 
 const name = ref('')
 // Certains navigateurs renvoient une valeur numérique (et non une chaîne) via v-model sur un input type="number"
 const number = ref<string | number>('')
 const position = ref('')
+const teamId = ref<string | null>(null)
 const editingId = ref<string | null>(null)
 const showArchived = ref(false)
+const filterTeamId = ref<string | 'ALL'>('ALL')
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
-onMounted(() => {
-  playersStore.fetchPlayers()
+onMounted(async () => {
+  const club = await clubsStore.ensureClub()
+  await Promise.all([playersStore.fetchPlayers(), teamsStore.fetchTeams(club.id)])
 })
 
-const visiblePlayers = computed(() =>
-  playersStore.players.filter((p) => showArchived.value || p.active),
-)
+const visiblePlayers = computed(() => {
+  let list = playersStore.players.filter((p) => showArchived.value || p.active)
+  if (filterTeamId.value !== 'ALL') list = list.filter((p) => p.teamId === filterTeamId.value)
+  // Trie par équipe (ordre de création des équipes), puis par numéro
+  const teamOrder = new Map(teamsStore.teams.map((t, i) => [t.id, i]))
+  return [...list].sort((a, b) => {
+    const orderA = a.teamId ? (teamOrder.get(a.teamId) ?? 999) : 998
+    const orderB = b.teamId ? (teamOrder.get(b.teamId) ?? 999) : 998
+    if (orderA !== orderB) return orderA - orderB
+    return (a.number ?? 99) - (b.number ?? 99)
+  })
+})
+
+function teamName(id: string | null): string {
+  if (!id) return 'Sans équipe'
+  return teamsStore.teams.find((t) => t.id === id)?.name ?? 'Équipe inconnue'
+}
 
 function startEdit(id: string) {
   const player = playersStore.players.find((p) => p.id === id)
@@ -30,6 +51,7 @@ function startEdit(id: string) {
   name.value = player.name
   number.value = player.number != null ? String(player.number) : ''
   position.value = player.position ?? ''
+  teamId.value = player.teamId
 }
 
 function resetForm() {
@@ -37,24 +59,31 @@ function resetForm() {
   name.value = ''
   number.value = ''
   position.value = ''
+  teamId.value = null
   errorMessage.value = null
 }
 
 async function handleSubmit() {
-  if (!name.value.trim()) return
+  if (!name.value.trim() || !clubsStore.club) return
   errorMessage.value = null
   saving.value = true
   try {
     const numberStr = String(number.value).trim()
-    const payload = {
-      name: name.value.trim(),
-      number: numberStr ? Number(numberStr) : null,
-      position: position.value.trim() || null,
-    }
     if (editingId.value) {
-      await playersStore.updatePlayer(editingId.value, payload)
+      await playersStore.updatePlayer(editingId.value, {
+        name: name.value.trim(),
+        number: numberStr ? Number(numberStr) : null,
+        position: position.value.trim() || null,
+        teamId: teamId.value,
+      })
     } else {
-      await playersStore.createPlayer(payload)
+      await playersStore.createPlayer({
+        name: name.value.trim(),
+        number: numberStr ? Number(numberStr) : null,
+        position: position.value.trim() || null,
+        clubId: clubsStore.club.id,
+        teamId: teamId.value,
+      })
     }
     resetForm()
   } catch (err: unknown) {
@@ -82,7 +111,13 @@ async function toggleActive(id: string, active: boolean) {
           <path d="m15 18-6-6 6-6" />
         </svg>
       </button>
-      <h1 class="text-sm font-semibold text-white">Effectif du club</h1>
+      <h1 class="text-sm font-semibold text-white flex-1">Effectif du club</h1>
+      <button
+        class="text-xs text-neutral-500 hover:text-white transition-colors"
+        @click="router.push({ name: 'teams' })"
+      >
+        Gérer les équipes
+      </button>
     </div>
 
     <div class="px-4 pt-5 max-w-2xl mx-auto">
@@ -126,6 +161,23 @@ async function toggleActive(id: string, active: boolean) {
                    text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
           />
         </div>
+        <div class="space-y-1">
+          <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Équipe</label>
+          <select
+            v-model="teamId"
+            class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
+                   text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+          >
+            <option :value="null">Sans équipe</option>
+            <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">
+              {{ t.name }}<span v-if="t.division"> · {{ t.division }}</span>
+            </option>
+          </select>
+          <p v-if="teamsStore.teams.length === 0" class="text-xs text-neutral-600">
+            Aucune équipe créée pour le moment —
+            <button type="button" class="underline hover:text-white" @click="router.push({ name: 'teams' })">en créer une</button>
+          </p>
+        </div>
 
         <p v-if="errorMessage" class="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
           {{ errorMessage }}
@@ -154,17 +206,27 @@ async function toggleActive(id: string, active: boolean) {
         </div>
       </form>
 
-      <!-- Liste effectif -->
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+      <!-- Filtres -->
+      <div class="flex items-center justify-between mb-3 gap-2">
+        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
           Joueurs ({{ visiblePlayers.length }})
         </h2>
-        <button
-          class="text-xs text-neutral-600 hover:text-neutral-400 transition-colors"
-          @click="showArchived = !showArchived"
-        >
-          {{ showArchived ? 'Masquer les archivés' : 'Voir les archivés' }}
-        </button>
+        <div class="flex items-center gap-2">
+          <select
+            v-model="filterTeamId"
+            class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
+                   focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+          >
+            <option value="ALL">Toutes les équipes</option>
+            <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">{{ t.name }}</option>
+          </select>
+          <button
+            class="text-xs text-neutral-600 hover:text-neutral-400 transition-colors whitespace-nowrap"
+            @click="showArchived = !showArchived"
+          >
+            {{ showArchived ? 'Masquer les archivés' : 'Voir les archivés' }}
+          </button>
+        </div>
       </div>
 
       <div v-if="playersStore.loading" class="flex items-center justify-center py-10">
@@ -191,7 +253,9 @@ async function toggleActive(id: string, active: boolean) {
             </span>
             <div class="flex-1 min-w-0">
               <p class="text-sm text-white font-medium truncate">{{ player.name }}</p>
-              <p v-if="player.position" class="text-xs text-neutral-500">{{ player.position }}</p>
+              <p class="text-xs text-neutral-500 truncate">
+                {{ teamName(player.teamId) }}<span v-if="player.position"> · {{ player.position }}</span>
+              </p>
             </div>
           </button>
           <button

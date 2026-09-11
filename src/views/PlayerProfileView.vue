@@ -3,22 +3,35 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayersStore } from '@/stores/players.store'
 import { usePlayerProfileStore } from '@/stores/playerProfile.store'
+import { useTeamsStore } from '@/stores/teams.store'
+import { useClubsStore } from '@/stores/clubs.store'
 import type { Player } from '@/types/match.types'
 
 const route = useRoute()
 const router = useRouter()
 const playersStore = usePlayersStore()
 const profileStore = usePlayerProfileStore()
+const teamsStore = useTeamsStore()
+const clubsStore = useClubsStore()
 
 const playerId = route.params.id as string
 const player = ref<Player | null>(null)
 
 onMounted(async () => {
   profileStore.reset()
-  if (playersStore.players.length === 0) await playersStore.fetchPlayers()
+  const club = await clubsStore.ensureClub()
+  await Promise.all([
+    playersStore.players.length === 0 ? playersStore.fetchPlayers() : Promise.resolve(),
+    teamsStore.fetchTeams(club.id),
+  ])
   player.value = playersStore.players.find((p) => p.id === playerId) ?? null
-  await profileStore.fetchProfile(playerId)
+  await profileStore.fetchProfile(playerId, player.value?.teamId ?? null)
 })
+
+function teamName(teamId: string | null): string {
+  if (!teamId) return 'Équipe non renseignée'
+  return teamsStore.teams.find((t) => t.id === teamId)?.name ?? 'Équipe inconnue'
+}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -47,7 +60,7 @@ function statusLabel(role: string, enteredAsSub: boolean): string {
       <div class="flex-1 min-w-0">
         <h1 class="text-sm font-semibold text-white truncate">{{ player?.name ?? 'Joueur' }}</h1>
         <p v-if="player" class="text-xs text-neutral-500">
-          {{ player.number != null ? `#${player.number}` : 'Sans numéro' }}<span v-if="player.position"> · {{ player.position }}</span>
+          {{ player.number != null ? `#${player.number}` : 'Sans numéro' }}<span v-if="player.position"> · {{ player.position }}</span> · {{ teamName(player.teamId) }}
         </p>
       </div>
     </div>
@@ -99,6 +112,13 @@ function statusLabel(role: string, enteredAsSub: boolean): string {
           </p>
         </div>
 
+        <!-- Renforts avec une autre équipe -->
+        <div v-if="profileStore.totals.calledUpCount > 0" class="bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-3 mb-6">
+          <p class="text-sm text-violet-300">
+            ⭐ Appelé en renfort avec une autre équipe sur {{ profileStore.totals.calledUpCount }} match{{ profileStore.totals.calledUpCount > 1 ? 's' : '' }}
+          </p>
+        </div>
+
         <!-- Détail par match -->
         <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">Historique des matchs</h2>
 
@@ -120,6 +140,7 @@ function statusLabel(role: string, enteredAsSub: boolean): string {
               <p class="text-xs text-neutral-500">
                 {{ formatDate(a.match.date) }} · {{ statusLabel(a.role, a.enteredAsSub) }}
                 <span v-if="a.minutesPlayed != null"> · {{ a.minutesPlayed }}'</span>
+                <span v-if="a.calledUp" class="text-violet-400"> · ⭐ {{ teamName(a.match.teamId) }}</span>
               </p>
             </div>
             <div class="flex items-center gap-2 text-xs shrink-0">

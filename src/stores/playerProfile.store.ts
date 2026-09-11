@@ -12,6 +12,8 @@ interface MatchAppearance {
   redCards: number
   enteredAsSub: boolean
   minutesPlayed: number | null
+  // true si ce match appartient à une autre équipe du club que l'équipe actuelle du joueur (renfort/promotion ponctuelle)
+  calledUp: boolean
 }
 
 // Mapping snake_case BDD → camelCase (identique à match.store)
@@ -27,6 +29,8 @@ function rowToMatch(row: Record<string, unknown>): Match {
     scoreAway: row.score_away as number,
     firstHalfMinutes: row.first_half_minutes as number | null,
     secondHalfMinutes: row.second_half_minutes as number | null,
+    clubId: row.club_id as string | null,
+    teamId: row.team_id as string | null,
     createdBy: row.created_by as string,
   }
 }
@@ -83,7 +87,7 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchProfile(playerId: string) {
+  async function fetchProfile(playerId: string, currentTeamId: string | null) {
     loading.value = true
     error.value = null
     appearances.value = []
@@ -135,6 +139,7 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
             redCards: matchEvents.filter((e) => e.type === 'RED_CARD' && e.playerId === playerId).length,
             enteredAsSub,
             minutesPlayed: minutes,
+            calledUp: currentTeamId != null && match.teamId != null && match.teamId !== currentTeamId,
           }
         })
         .sort((a, b) => b.match.date.localeCompare(a.match.date))
@@ -166,6 +171,7 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
       totalMinutes,
       averageMinutes: minutesKnown.length > 0 ? Math.round(totalMinutes / minutesKnown.length) : null,
       minutesKnownForAll: minutesKnown.length === played.length,
+      calledUpCount: played.filter((a) => a.calledUp).length,
     }
   })
 

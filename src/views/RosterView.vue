@@ -171,7 +171,7 @@ async function toggleActive(id: string, active: boolean) {
           <select
             v-model="teamId"
             class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
-                   text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+                   text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
           >
             <option :value="null">Sans équipe</option>
             <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">
@@ -220,7 +220,7 @@ async function toggleActive(id: string, active: boolean) {
           <select
             v-model="filterTeamId"
             class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
-                   focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+                   focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
           >
             <option value="ALL">Toutes les équipes</option>
             <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">{{ t.name }}</option>

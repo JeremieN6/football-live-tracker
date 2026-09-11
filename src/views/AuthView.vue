@@ -22,7 +22,7 @@ async function handleSubmit() {
   try {
     if (mode.value === 'login') {
       await authStore.signIn(email.value, password.value)
-      await router.push({ name: 'history' })
+      await router.push({ name: 'home' })
     } else {
       const needsConfirmation = await authStore.signUp(email.value, password.value)
       if (needsConfirmation) {
@@ -30,7 +30,7 @@ async function handleSubmit() {
         successMessage.value = 'Compte créé ! Vérifiez votre email pour confirmer votre inscription.'
       } else {
         // Confirmation email désactivée — session créée directement
-        await router.push({ name: 'history' })
+        await router.push({ name: 'home' })
       }
     }
   } catch (err: unknown) {

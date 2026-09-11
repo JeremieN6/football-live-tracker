@@ -2,18 +2,14 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMatchStore } from '@/stores/match.store'
-import { useAuthStore } from '@/stores/auth.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
-import { useAdminClubsStore } from '@/stores/adminClubs.store'
 import CreateMatchModal from '@/components/tracker/CreateMatchModal.vue'
 
 const router = useRouter()
 const matchStore = useMatchStore()
-const authStore = useAuthStore()
 const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
-const adminStore = useAdminClubsStore()
 
 const showCreateModal = ref(false)
 const filterTeamId = ref<string | 'ALL'>('ALL')
@@ -22,7 +18,6 @@ onMounted(async () => {
   matchStore.fetchMatches()
   const club = await clubsStore.ensureClub().catch(() => null)
   if (club) await teamsStore.fetchTeams(club.id)
-  adminStore.checkAdmin().catch(() => {})
 })
 
 function teamName(id: string | null): string {
@@ -54,11 +49,6 @@ function goToReport(id: string) {
   router.push({ name: 'report', params: { id } })
 }
 
-async function handleSignOut() {
-  await authStore.signOut()
-  router.push({ name: 'auth' })
-}
-
 const filteredMatches = computed(() => {
   if (filterTeamId.value === 'ALL') return matchStore.matches
   return matchStore.matches.filter((m) => m.teamId === filterTeamId.value)
@@ -72,51 +62,23 @@ const hasFilteredMatches = computed(() => filteredMatches.value.length > 0)
   <div class="min-h-screen bg-neutral-950 text-white">
 
     <!-- Header -->
-    <header class="border-b border-white/10 px-4 py-4">
-      <div class="max-w-2xl mx-auto flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-5 h-5 text-neutral-400">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 2a10 10 0 0 1 0 20M2 12h20M12 2c-2.5 3-4 6.3-4 10s1.5 7 4 10M12 2c2.5 3 4 6.3 4 10s-1.5 7-4 10" />
-          </svg>
-          <span class="font-semibold text-sm">NRV</span>
-        </div>
-        <div class="flex items-center gap-4 flex-wrap justify-end">
-          <button
-            v-if="adminStore.isAdmin"
-            class="text-xs text-amber-400 hover:text-amber-300 transition-colors"
-            @click="router.push({ name: 'admin-clubs' })"
-          >
-            Admin
-          </button>
-          <button
-            class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
-            @click="router.push({ name: 'members' })"
-          >
-            Membres
-          </button>
-          <button
-            class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
-            @click="router.push({ name: 'club' })"
-          >
-            {{ clubsStore.club?.name ?? 'Mon club' }}
-          </button>
-          <button
-            class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
-            @click="handleSignOut"
-          >
-            Déconnexion
-          </button>
-        </div>
-      </div>
-    </header>
+    <div class="sticky top-0 z-30 bg-neutral-950/80 backdrop-blur-sm border-b border-white/5 px-4 py-3 flex items-center gap-3">
+      <button
+        class="text-neutral-500 hover:text-white transition-colors p-1 -ml-1"
+        @click="router.push({ name: 'home' })"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+      </button>
+      <h1 class="text-sm font-semibold text-white">Matchs</h1>
+    </div>
 
     <!-- Contenu principal -->
-    <main class="max-w-2xl mx-auto px-4 py-8">
+    <main class="max-w-2xl mx-auto px-4 py-6">
 
-      <!-- Titre + bouton nouveau match -->
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl font-semibold">Matchs</h1>
+      <!-- Bouton nouveau match -->
+      <div class="flex items-center justify-end mb-4">
         <button
           v-if="clubsStore.canWrite"
           class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-white text-neutral-900 text-sm font-semibold

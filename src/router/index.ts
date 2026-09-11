@@ -4,12 +4,18 @@ import type { RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/history',
+    redirect: '/home',
   },
   {
     path: '/auth',
     name: 'auth',
     component: () => import('@/views/AuthView.vue'),
+  },
+  {
+    path: '/home',
+    name: 'home',
+    component: () => import('@/views/HomeView.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: '/pending',
@@ -121,7 +127,7 @@ router.beforeEach(async (to) => {
 
   // Le club est actif : /pending et /create-club n'ont plus lieu d'être.
   if (to.name === 'pending' || to.name === 'create-club') {
-    return { name: 'history' }
+    return { name: 'home' }
   }
 
   return true

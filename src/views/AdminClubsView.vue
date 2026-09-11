@@ -67,7 +67,7 @@ async function handleReject(id: string, name: string) {
     <div class="sticky top-0 z-30 bg-neutral-950/80 backdrop-blur-sm border-b border-white/5 px-4 py-3 flex items-center gap-3">
       <button
         class="text-neutral-500 hover:text-white transition-colors p-1 -ml-1"
-        @click="router.push({ name: 'history' })"
+        @click="router.push({ name: 'home' })"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
           <path d="m15 18-6-6 6-6" />

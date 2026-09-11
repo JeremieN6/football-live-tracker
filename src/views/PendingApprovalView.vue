@@ -19,7 +19,7 @@ async function recheck() {
     clubsStore.reset()
     const club = await clubsStore.ensureClub()
     if (club.status === 'ACTIVE') {
-      router.push({ name: 'history' })
+      router.push({ name: 'home' })
     }
   } catch (err: unknown) {
     errorMessage.value = extractErrorMessage(err, 'Erreur lors de la vérification.')

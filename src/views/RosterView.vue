@@ -143,7 +143,6 @@ async function toggleActive(id: string, active: boolean) {
 
       <!-- Bouton d'ouverture du formulaire -->
       <button
-        v-if="!showForm"
         class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
                hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
         @click="showForm = true"
@@ -153,102 +152,6 @@ async function toggleActive(id: string, active: boolean) {
         </svg>
         Ajouter un joueur
       </button>
-
-      <!-- Formulaire ajout / édition -->
-      <form v-else class="bg-white/5 border border-white/8 rounded-2xl p-4 mb-6 space-y-3" @submit.prevent="handleSubmit">
-        <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-white">{{ editingId ? 'Modifier le joueur' : 'Nouveau joueur' }}</h2>
-          <button
-            type="button"
-            class="text-neutral-500 hover:text-white transition-colors p-1 -mr-1"
-            @click="resetForm"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div class="grid grid-cols-[1fr_auto] gap-3">
-          <div class="space-y-1">
-            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Nom</label>
-            <input
-              v-model="name"
-              type="text"
-              required
-              placeholder="Ex: Karim B."
-              maxlength="50"
-              class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
-                     text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
-            />
-          </div>
-          <div class="space-y-1 w-20">
-            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">N°</label>
-            <input
-              v-model="number"
-              type="number"
-              min="1"
-              max="99"
-              placeholder="9"
-              class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
-                     text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
-            />
-          </div>
-        </div>
-        <div class="space-y-1">
-          <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Poste (optionnel)</label>
-          <input
-            v-model="position"
-            type="text"
-            placeholder="Ex: Attaquant, Milieu, Défenseur..."
-            maxlength="40"
-            class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
-                   text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
-          />
-        </div>
-        <div class="space-y-1">
-          <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Équipe</label>
-          <select
-            v-model="teamId"
-            class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
-                   text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
-          >
-            <option :value="null">Sans équipe</option>
-            <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">
-              {{ t.name }}<span v-if="t.division"> · {{ t.division }}</span>
-            </option>
-          </select>
-          <p v-if="teamsStore.teams.length === 0" class="text-xs text-neutral-600">
-            Aucune équipe créée pour le moment —
-            <button type="button" class="underline hover:text-white" @click="router.push({ name: 'teams' })">en créer une</button>
-          </p>
-        </div>
-
-        <p v-if="errorMessage" class="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
-          {{ errorMessage }}
-        </p>
-
-        <div class="flex gap-3 pt-1">
-          <button
-            v-if="editingId"
-            type="button"
-            class="flex-1 h-11 rounded-lg border border-white/10 text-neutral-400 text-sm font-medium
-                   hover:border-white/20 hover:text-white transition-all"
-            @click="resetForm"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            :disabled="saving || !name.trim()"
-            class="flex-1 h-11 rounded-lg bg-white text-neutral-900 text-sm font-semibold
-                   hover:bg-neutral-100 disabled:opacity-50 transition-all"
-          >
-            <span v-if="saving">Enregistrement...</span>
-            <span v-else-if="editingId">Mettre à jour</span>
-            <span v-else>Ajouter au club</span>
-          </button>
-        </div>
-      </form>
 
       <!-- Recherche -->
       <div class="relative mb-3">
@@ -344,6 +247,109 @@ async function toggleActive(id: string, active: boolean) {
             {{ player.active ? 'Archiver' : 'Réactiver' }}
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Popup ajout / édition -->
+    <div
+      v-if="showForm"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
+      @click.self="resetForm"
+    >
+      <div class="w-full max-w-md bg-neutral-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-lg font-semibold text-white">{{ editingId ? 'Modifier le joueur' : 'Nouveau joueur' }}</h2>
+          <button
+            class="text-neutral-500 hover:text-white transition-colors p-1"
+            @click="resetForm"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form class="space-y-4" @submit.prevent="handleSubmit">
+          <div class="grid grid-cols-[1fr_auto] gap-3">
+            <div class="space-y-1">
+              <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Nom</label>
+              <input
+                v-model="name"
+                type="text"
+                required
+                placeholder="Ex: Karim B."
+                maxlength="50"
+                class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
+                       text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+              />
+            </div>
+            <div class="space-y-1 w-20">
+              <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">N°</label>
+              <input
+                v-model="number"
+                type="number"
+                min="1"
+                max="99"
+                placeholder="9"
+                class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
+                       text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+              />
+            </div>
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Poste (optionnel)</label>
+            <input
+              v-model="position"
+              type="text"
+              placeholder="Ex: Attaquant, Milieu, Défenseur..."
+              maxlength="40"
+              class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
+                     text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+            />
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Équipe</label>
+            <select
+              v-model="teamId"
+              class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
+                     text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
+            >
+              <option :value="null">Sans équipe</option>
+              <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">
+                {{ t.name }}<span v-if="t.division"> · {{ t.division }}</span>
+              </option>
+            </select>
+            <p v-if="teamsStore.teams.length === 0" class="text-xs text-neutral-600">
+              Aucune équipe créée pour le moment —
+              <button type="button" class="underline hover:text-white" @click="router.push({ name: 'teams' })">en créer une</button>
+            </p>
+          </div>
+
+          <p v-if="errorMessage" class="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+            {{ errorMessage }}
+          </p>
+
+          <div class="flex gap-3 pt-2">
+            <button
+              type="button"
+              class="flex-1 h-11 rounded-lg border border-white/10 text-neutral-400 text-sm font-medium
+                     hover:border-white/20 hover:text-white transition-all"
+              @click="resetForm"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              :disabled="saving || !name.trim()"
+              class="flex-1 h-11 rounded-lg bg-white text-neutral-900 text-sm font-semibold
+                     hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              <span v-if="saving">Enregistrement...</span>
+              <span v-else-if="editingId">Mettre à jour</span>
+              <span v-else>Ajouter au club</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

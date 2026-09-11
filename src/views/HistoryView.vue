@@ -76,7 +76,7 @@ const hasFilteredMatches = computed(() => filteredMatches.value.length > 0)
             <circle cx="12" cy="12" r="10" />
             <path d="M12 2a10 10 0 0 1 0 20M2 12h20M12 2c-2.5 3-4 6.3-4 10s1.5 7 4 10M12 2c2.5 3 4 6.3 4 10s-1.5 7-4 10" />
           </svg>
-          <span class="font-semibold text-sm">Match Report AI</span>
+          <span class="font-semibold text-sm">NRV</span>
         </div>
         <div class="flex items-center gap-4 flex-wrap justify-end">
           <button

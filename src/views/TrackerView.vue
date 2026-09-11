@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from 'uuid'
 import { useMatchStore } from '@/stores/match.store'
 import { useEventsStore } from '@/stores/events.store'
 import { useAuthStore } from '@/stores/auth.store'
+import { usePlayersStore } from '@/stores/players.store'
+import { useLineupStore } from '@/stores/lineup.store'
 import { useTimer } from '@/composables/useTimer'
 import { useOfflineQueue } from '@/composables/useOfflineQueue'
 import { useMatchSync } from '@/composables/useMatchSync'
@@ -12,6 +14,8 @@ import MatchTimer from '@/components/tracker/MatchTimer.vue'
 import PitchMap from '@/components/tracker/PitchMap.vue'
 import ActionButtons from '@/components/tracker/ActionButtons.vue'
 import SubstitutionModal from '@/components/tracker/SubstitutionModal.vue'
+import GoalDetailsModal from '@/components/tracker/GoalDetailsModal.vue'
+import CardPlayerModal from '@/components/tracker/CardPlayerModal.vue'
 import EventLog from '@/components/tracker/EventLog.vue'
 import type { EventType, MatchEvent, ZoneX, ZoneY } from '@/types/match.types'
 
@@ -20,6 +24,8 @@ const router = useRouter()
 const matchStore = useMatchStore()
 const eventsStore = useEventsStore()
 const authStore = useAuthStore()
+const playersStore = usePlayersStore()
+const lineupStore = useLineupStore()
 const timer = useTimer()
 const { pendingCount, addEventWithFallback } = useOfflineQueue()
 
@@ -32,11 +38,30 @@ const showSubstitutionModal = ref(false)
 const showFinishConfirm = ref(false)
 const finishing = ref(false)
 
+// But / carton en attente de confirmation du joueur concerné
+const pendingGoalPos = ref<{ pitchX: number; pitchY: number; zoneX: ZoneX; zoneY: ZoneY } | null>(null)
+const pendingCardType = ref<EventType | null>(null)
+
+// Effectif sélectionné pour ce match, résolu en objets Player
+const lineupPlayers = computed(() => {
+  const idsByRole = new Map(lineupStore.entries.map((e) => [e.playerId, e.role]))
+  return playersStore.players
+    .filter((p) => idsByRole.has(p.id))
+    .sort((a, b) => {
+      const roleA = idsByRole.get(a.id)
+      const roleB = idsByRole.get(b.id)
+      if (roleA !== roleB) return roleA === 'STARTER' ? -1 : 1
+      return (a.number ?? 99) - (b.number ?? 99)
+    })
+})
+
 onMounted(async () => {
   eventsStore.reset()
   await Promise.all([
     matchStore.fetchMatch(matchId),
     eventsStore.fetchEvents(matchId),
+    playersStore.fetchPlayers(),
+    lineupStore.fetchLineup(matchId),
   ])
   // Passe le match en LIVE si PENDING
   if (matchStore.currentMatch?.status === 'PENDING') {
@@ -61,10 +86,14 @@ const scoreAway = computed(
 // Actions qui s'enregistrent sans clic terrain
 const INSTANT_ACTIONS = new Set<EventType>(['YELLOW_CARD', 'RED_CARD'])
 
-// Clic sur une action — si instantanée, on enregistre directement
+// Clic sur une action — si instantanée, on enregistre directement (ou on demande le joueur si l'effectif est connu)
 function handleActionSelect(action: EventType) {
   if (INSTANT_ACTIONS.has(action)) {
-    recordEvent(action, null, null, null, null)
+    if (lineupPlayers.value.length === 0) {
+      recordEvent(action, null, null, null, null)
+    } else {
+      pendingCardType.value = action
+    }
     return
   }
   selectedAction.value = action
@@ -77,16 +106,40 @@ function handleActionDeselect() {
 // Clic sur le terrain — enregistre l'événement avec position
 function handlePitchClick(pos: { pitchX: number; pitchY: number; zoneX: ZoneX; zoneY: ZoneY }) {
   if (!selectedAction.value) return
+  if (selectedAction.value === 'GOAL_FOR' && lineupPlayers.value.length > 0) {
+    pendingGoalPos.value = pos
+    selectedAction.value = null
+    return
+  }
   recordEvent(selectedAction.value, pos.pitchX, pos.pitchY, pos.zoneX, pos.zoneY)
   selectedAction.value = null
 }
 
+// Confirmation but : buteur + passeur décisif éventuel
+function handleGoalConfirm(data: { scorerId: string | null; assistId: string | null }) {
+  if (!pendingGoalPos.value) return
+  const event = buildEvent('GOAL_FOR', pendingGoalPos.value.pitchX, pendingGoalPos.value.pitchY, pendingGoalPos.value.zoneX, pendingGoalPos.value.zoneY)
+  event.scorerId = data.scorerId
+  event.assistId = data.assistId
+  addEventWithFallback(event)
+  pendingGoalPos.value = null
+}
+
+// Confirmation carton : joueur sanctionné
+function handleCardConfirm(playerId: string | null) {
+  if (!pendingCardType.value) return
+  const event = buildEvent(pendingCardType.value, null, null, null, null)
+  event.playerId = playerId
+  addEventWithFallback(event)
+  pendingCardType.value = null
+}
+
 // Confirmation remplacement
-function handleSubstitutionConfirm(data: { playerIn: string; playerOut: string }) {
+function handleSubstitutionConfirm(data: { playerInId: string; playerOutId: string }) {
   showSubstitutionModal.value = false
   const event: MatchEvent = buildEvent('SUBSTITUTION', null, null, null, null)
-  event.playerIn = data.playerIn
-  event.playerOut = data.playerOut
+  event.playerInId = data.playerInId
+  event.playerOutId = data.playerOutId
   addEventWithFallback(event)
 }
 
@@ -109,8 +162,11 @@ function buildEvent(
     pitchY,
     zoneX,
     zoneY,
-    playerIn: null,
-    playerOut: null,
+    scorerId: null,
+    assistId: null,
+    playerId: null,
+    playerInId: null,
+    playerOutId: null,
     createdBy: authStore.user?.id ?? '',
     createdAt: new Date().toISOString(),
   }
@@ -207,6 +263,7 @@ async function handleFinishMatch() {
       <!-- Log des événements -->
       <EventLog
         :events="eventsStore.events"
+        :players="lineupPlayers"
         @delete="handleDeleteEvent"
       />
 
@@ -222,10 +279,30 @@ async function handleFinishMatch() {
       </div>
     </template>
 
+    <!-- Modal but : buteur + passeur -->
+    <GoalDetailsModal
+      v-if="pendingGoalPos"
+      :minute="timer.currentMinute.value"
+      :players="lineupPlayers"
+      @confirm="handleGoalConfirm"
+      @cancel="pendingGoalPos = null"
+    />
+
+    <!-- Modal carton : joueur sanctionné -->
+    <CardPlayerModal
+      v-if="pendingCardType"
+      :type="pendingCardType"
+      :minute="timer.currentMinute.value"
+      :players="lineupPlayers"
+      @confirm="handleCardConfirm"
+      @cancel="pendingCardType = null"
+    />
+
     <!-- Modal remplacement -->
     <SubstitutionModal
       v-if="showSubstitutionModal"
       :minute="timer.currentMinute.value"
+      :players="lineupPlayers"
       @confirm="handleSubstitutionConfirm"
       @cancel="showSubstitutionModal = false"
     />

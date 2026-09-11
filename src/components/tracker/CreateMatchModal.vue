@@ -28,7 +28,7 @@ async function handleSubmit() {
       date: date.value,
     })
     emit('close')
-    await router.push({ name: 'tracker', params: { id: match.id } })
+    await router.push({ name: 'lineup', params: { id: match.id } })
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : 'Erreur lors de la création.'
   } finally {

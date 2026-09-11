@@ -21,8 +21,11 @@ interface EventRow {
   half: number
   zone_x: string | null
   zone_y: string | null
-  player_in: string | null
-  player_out: string | null
+  scorer_id: string | null
+  assist_id: string | null
+  player_id: string | null
+  player_in_id: string | null
+  player_out_id: string | null
 }
 
 interface MatchStats {
@@ -73,11 +76,27 @@ function buildStats(events: EventRow[]): MatchStats {
   }
 }
 
-function buildPrompt(match: MatchRow, stats: MatchStats, events: EventRow[]): string {
+function buildPrompt(match: MatchRow, stats: MatchStats, events: EventRow[], playerNames: Map<string, string>): string {
+  const name = (id: string | null) => (id ? playerNames.get(id) ?? "joueur non identifié" : null)
+
   const subLines = events
-    .filter((e) => e.type === "SUBSTITUTION" && e.player_in && e.player_out)
-    .map((e) => `  - ${e.minute}' : ${e.player_in} remplace ${e.player_out}`)
+    .filter((e) => e.type === "SUBSTITUTION" && e.player_in_id && e.player_out_id)
+    .map((e) => `  - ${e.minute}' : ${name(e.player_in_id)} remplace ${name(e.player_out_id)}`)
     .join("\n") || "  Aucun remplacement"
+
+  const goalLines = events
+    .filter((e) => e.type === "GOAL_FOR")
+    .map((e) => {
+      const scorer = name(e.scorer_id) ?? "buteur non précisé"
+      const assist = e.assist_id ? ` (passe décisive : ${name(e.assist_id)})` : ""
+      return `  - ${e.minute}' : ${scorer}${assist}`
+    })
+    .join("\n") || "  Aucun but"
+
+  const cardLines = events
+    .filter((e) => e.type === "YELLOW_CARD" || e.type === "RED_CARD")
+    .map((e) => `  - ${e.minute}' : ${e.type === "RED_CARD" ? "carton rouge" : "carton jaune"} — ${name(e.player_id) ?? "joueur non précisé"}`)
+    .join("\n") || "  Aucun carton"
 
   const score = `${stats.goalsFor} - ${stats.goalsAgainst}`
 
@@ -97,7 +116,14 @@ STATISTIQUES :
 - Dangers subis : ${stats.dangersSuffered}
 - Cartons jaunes : ${stats.yellowCards}
 - Cartons rouges : ${stats.redCards}
-- Remplacements :
+
+BUTS :
+${goalLines}
+
+CARTONS :
+${cardLines}
+
+REMPLACEMENTS :
 ${subLines}
 
 CONTRAINTES DE RÉPONSE :
@@ -270,14 +296,34 @@ Deno.serve(async (req: Request) => {
     // Récupérer les événements
     const { data: events, error: eventsError } = await supabaseAdmin
       .from("events")
-      .select("type, minute, half, zone_x, zone_y, player_in, player_out")
+      .select("type, minute, half, zone_x, zone_y, scorer_id, assist_id, player_id, player_in_id, player_out_id")
       .eq("match_id", matchId)
       .order("minute", { ascending: true })
     if (eventsError) throw new Error(toErrorMessage(eventsError, "Erreur chargement evenements"))
 
+    const eventRows = (events ?? []) as EventRow[]
+
+    // Résoudre les noms des joueurs référencés (buteur, passeur, carton, remplacement)
+    const playerIds = new Set<string>()
+    for (const e of eventRows) {
+      for (const id of [e.scorer_id, e.assist_id, e.player_id, e.player_in_id, e.player_out_id]) {
+        if (id) playerIds.add(id)
+      }
+    }
+    const playerNames = new Map<string, string>()
+    if (playerIds.size > 0) {
+      const { data: players } = await supabaseAdmin
+        .from("players")
+        .select("id, name")
+        .in("id", [...playerIds])
+      for (const p of players ?? []) {
+        playerNames.set(p.id as string, p.name as string)
+      }
+    }
+
     // Construire les stats et le prompt
-    const stats = buildStats((events ?? []) as EventRow[])
-    const prompt = buildPrompt(match as MatchRow, stats, (events ?? []) as EventRow[])
+    const stats = buildStats(eventRows)
+    const prompt = buildPrompt(match as MatchRow, stats, eventRows, playerNames)
 
     // Appel Claude (Anthropic)
     // Priorite: secret ANTHROPIC_MODEL, puis fallback sur modeles courants.

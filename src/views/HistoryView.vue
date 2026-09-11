@@ -60,12 +60,20 @@ const hasMatches = computed(() => matchStore.matches.length > 0)
           </svg>
           <span class="font-semibold text-sm">Match Report AI</span>
         </div>
-        <button
-          class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
-          @click="handleSignOut"
-        >
-          Déconnexion
-        </button>
+        <div class="flex items-center gap-4">
+          <button
+            class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
+            @click="router.push({ name: 'roster' })"
+          >
+            Effectif
+          </button>
+          <button
+            class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
+            @click="handleSignOut"
+          >
+            Déconnexion
+          </button>
+        </div>
       </div>
     </header>
 

@@ -84,6 +84,8 @@ export interface ClubTeam {
   clubId: string
   name: string
   division: string | null
+  category: string | null
+  formation: string | null
   createdAt: string
 }
 

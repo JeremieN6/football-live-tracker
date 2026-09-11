@@ -54,7 +54,7 @@ function handleSkip() {
         <select
           v-model="playerId"
           class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
-                 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+                 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
         >
           <option :value="null">Non précisé</option>
           <option v-for="p in props.players" :key="p.id" :value="p.id">{{ playerLabel(p) }}</option>

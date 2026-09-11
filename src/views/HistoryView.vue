@@ -63,6 +63,12 @@ const hasMatches = computed(() => matchStore.matches.length > 0)
         <div class="flex items-center gap-4">
           <button
             class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
+            @click="router.push({ name: 'teams' })"
+          >
+            Équipes
+          </button>
+          <button
+            class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
             @click="router.push({ name: 'roster' })"
           >
             Effectif

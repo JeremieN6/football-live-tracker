@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useMatchStore } from '@/stores/match.store'
+import { useClubsStore } from '@/stores/clubs.store'
+import { useTeamsStore } from '@/stores/teams.store'
 import { useRouter } from 'vue-router'
+import { extractErrorMessage } from '@/lib/errors'
 
 const emit = defineEmits<{ close: [] }>()
 
 const matchStore = useMatchStore()
+const clubsStore = useClubsStore()
+const teamsStore = useTeamsStore()
 const router = useRouter()
 
 const homeTeam = ref('')
@@ -13,10 +18,22 @@ const awayTeam = ref('')
 const competition = ref('')
 // Date du jour par défaut
 const date = ref(new Date().toISOString().split('T')[0])
+const teamId = ref<string | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 
+onMounted(async () => {
+  try {
+    const club = await clubsStore.ensureClub()
+    await teamsStore.fetchTeams(club.id)
+    if (teamsStore.teams.length === 1) teamId.value = teamsStore.teams[0].id
+  } catch (err: unknown) {
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
+  }
+})
+
 async function handleSubmit() {
+  if (!clubsStore.club) return
   errorMessage.value = null
   loading.value = true
 
@@ -26,11 +43,13 @@ async function handleSubmit() {
       awayTeam: awayTeam.value.trim(),
       competition: competition.value.trim(),
       date: date.value,
+      clubId: clubsStore.club.id,
+      teamId: teamId.value,
     })
     emit('close')
     await router.push({ name: 'lineup', params: { id: match.id } })
   } catch (err: unknown) {
-    errorMessage.value = err instanceof Error ? err.message : 'Erreur lors de la création.'
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors de la création.')
   } finally {
     loading.value = false
   }
@@ -62,7 +81,22 @@ async function handleSubmit() {
       <!-- Formulaire -->
       <form class="space-y-4" @submit.prevent="handleSubmit">
 
-        <!-- Équipes -->
+        <!-- Équipe du club concernée -->
+        <div v-if="teamsStore.teams.length > 0" class="space-y-1">
+          <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Votre équipe</label>
+          <select
+            v-model="teamId"
+            class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
+                   text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
+          >
+            <option :value="null">Non précisée</option>
+            <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">
+              {{ t.name }}<span v-if="t.division"> · {{ t.division }}</span>
+            </option>
+          </select>
+        </div>
+
+        <!-- Équipes (adversaire) -->
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1">
             <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Domicile</label>

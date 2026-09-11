@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { Player } from '@/types/match.types'
+import { extractErrorMessage } from '@/lib/errors'
 
 // Mapping snake_case BDD → camelCase TypeScript
 function rowToPlayer(row: Record<string, unknown>): Player {
@@ -11,6 +12,8 @@ function rowToPlayer(row: Record<string, unknown>): Player {
     number: row.number as number | null,
     position: row.position as string | null,
     active: row.active as boolean,
+    clubId: row.club_id as string | null,
+    teamId: row.team_id as string | null,
     createdBy: row.created_by as string,
     createdAt: row.created_at as string,
   }
@@ -34,14 +37,20 @@ export const usePlayersStore = defineStore('players', () => {
       if (sbError) throw sbError
       players.value = (data ?? []).map(rowToPlayer)
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Erreur lors du chargement de l\'effectif.'
+      error.value = extractErrorMessage(err, 'Erreur lors du chargement de l\'effectif.')
     } finally {
       loading.value = false
     }
   }
 
-  // Ajoute un joueur à l'effectif du club
-  async function createPlayer(payload: { name: string; number: number | null; position: string | null }): Promise<Player> {
+  // Ajoute un joueur à l'effectif du club, rattaché à une équipe
+  async function createPlayer(payload: {
+    name: string
+    number: number | null
+    position: string | null
+    clubId: string
+    teamId: string | null
+  }): Promise<Player> {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) throw new Error('Non authentifié.')
 
@@ -51,6 +60,8 @@ export const usePlayersStore = defineStore('players', () => {
         name: payload.name,
         number: payload.number,
         position: payload.position,
+        club_id: payload.clubId,
+        team_id: payload.teamId,
         created_by: userData.user.id,
       })
       .select()
@@ -63,11 +74,14 @@ export const usePlayersStore = defineStore('players', () => {
     return player
   }
 
-  // Modifie un joueur (nom, numéro, poste)
-  async function updatePlayer(id: string, payload: { name: string; number: number | null; position: string | null }) {
+  // Modifie un joueur (nom, numéro, poste, équipe)
+  async function updatePlayer(
+    id: string,
+    payload: { name: string; number: number | null; position: string | null; teamId: string | null },
+  ) {
     const { error: sbError } = await supabase
       .from('players')
-      .update({ name: payload.name, number: payload.number, position: payload.position })
+      .update({ name: payload.name, number: payload.number, position: payload.position, team_id: payload.teamId })
       .eq('id', id)
 
     if (sbError) throw sbError

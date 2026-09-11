@@ -18,9 +18,21 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/teams',
+    name: 'teams',
+    component: () => import('@/views/TeamsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/roster',
     name: 'roster',
     component: () => import('@/views/RosterView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/roster/:id',
+    name: 'player-profile',
+    component: () => import('@/views/PlayerProfileView.vue'),
     meta: { requiresAuth: true },
   },
   {

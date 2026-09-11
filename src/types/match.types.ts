@@ -64,7 +64,26 @@ export interface Player {
   number: number | null
   position: string | null
   active: boolean
+  // Équipe du club à laquelle le joueur est actuellement rattaché
+  clubId: string | null
+  teamId: string | null
   createdBy: string
+  createdAt: string
+}
+
+export interface Club {
+  id: string
+  name: string
+  ownerId: string
+  createdAt: string
+}
+
+// "ClubTeam" pour ne pas entrer en collision avec le type Team ('HOME'/'AWAY') des événements
+export interface ClubTeam {
+  id: string
+  clubId: string
+  name: string
+  division: string | null
   createdAt: string
 }
 
@@ -88,6 +107,12 @@ export interface Match {
   status: MatchStatus
   scoreHome: number
   scoreAway: number
+  // Durée de chaque mi-temps (minutes), renseignée à la fin du match — sert au calcul des minutes jouées
+  firstHalfMinutes: number | null
+  secondHalfMinutes: number | null
+  // Équipe du club concernée par ce match (ex: Équipe 1, Équipe réserve)
+  clubId: string | null
+  teamId: string | null
   createdBy: string
 }
 

@@ -5,6 +5,7 @@ import { useMatchStore } from '@/stores/match.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useLineupStore } from '@/stores/lineup.store'
 import type { LineupRole } from '@/types/match.types'
+import { extractErrorMessage } from '@/lib/errors'
 
 const route = useRoute()
 const router = useRouter()
@@ -59,7 +60,7 @@ async function handleSave() {
     await lineupStore.saveLineup(matchId, payload)
     router.push({ name: 'tracker', params: { id: matchId } })
   } catch (err: unknown) {
-    errorMessage.value = err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement.'
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors de l\'enregistrement.')
   } finally {
     saving.value = false
   }

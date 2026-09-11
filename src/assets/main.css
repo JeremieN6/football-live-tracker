@@ -121,4 +121,11 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* color-scheme:dark seul ne suffit pas partout (Chrome/Windows notamment) pour
+     styler la liste déroulante d'un <select> natif : on force le fond/texte des
+     options explicitement, sinon le popup rend en clair par défaut du système. */
+  select option {
+    background-color: #171717;
+    color: #fff;
+  }
 }

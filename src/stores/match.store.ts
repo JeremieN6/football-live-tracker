@@ -14,6 +14,8 @@ function rowToMatch(row: Record<string, unknown>): Match {
     status: row.status as MatchStatus,
     scoreHome: row.score_home as number,
     scoreAway: row.score_away as number,
+    firstHalfMinutes: row.first_half_minutes as number | null,
+    secondHalfMinutes: row.second_half_minutes as number | null,
     createdBy: row.created_by as string,
   }
 }
@@ -110,5 +112,23 @@ export const useMatchStore = defineStore('match', () => {
     if (currentMatch.value?.id === id) currentMatch.value.status = status
   }
 
-  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatchStatus }
+  // Termine un match en enregistrant la durée de chaque mi-temps (pour le calcul des minutes jouées)
+  async function finishMatch(id: string, durations: { firstHalfMinutes: number; secondHalfMinutes: number }) {
+    const { error: sbError } = await supabase
+      .from('matches')
+      .update({
+        status: 'FINISHED',
+        first_half_minutes: durations.firstHalfMinutes,
+        second_half_minutes: durations.secondHalfMinutes,
+      })
+      .eq('id', id)
+
+    if (sbError) throw sbError
+
+    const idx = matches.value.findIndex((m) => m.id === id)
+    if (idx !== -1) Object.assign(matches.value[idx], { status: 'FINISHED', ...durations })
+    if (currentMatch.value?.id === id) Object.assign(currentMatch.value, { status: 'FINISHED', ...durations })
+  }
+
+  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatchStatus, finishMatch }
 })

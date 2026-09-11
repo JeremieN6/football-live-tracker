@@ -42,6 +42,14 @@ const finishing = ref(false)
 const pendingGoalPos = ref<{ pitchX: number; pitchY: number; zoneX: ZoneX; zoneY: ZoneY } | null>(null)
 const pendingCardType = ref<EventType | null>(null)
 
+// Durée de la 1ère mi-temps, capturée avant que le chrono ne se remette à zéro (sert au calcul des minutes jouées)
+const firstHalfMinutes = ref<number | null>(null)
+
+function handleSwitchHalf() {
+  firstHalfMinutes.value = timer.currentMinute.value
+  timer.switchHalf()
+}
+
 // Effectif sélectionné pour ce match, résolu en objets Player
 const lineupPlayers = computed(() => {
   const idsByRole = new Map(lineupStore.entries.map((e) => [e.playerId, e.role]))
@@ -190,7 +198,10 @@ async function handleDeleteEvent(id: string) {
 async function handleFinishMatch() {
   finishing.value = true
   try {
-    await matchStore.updateMatchStatus(matchId, 'FINISHED')
+    // Si le match se termine en 1ère mi-temps (jamais basculé), toute la durée est comptée en 1ère mi-temps
+    const first = timer.half.value === 1 ? timer.currentMinute.value : (firstHalfMinutes.value ?? 0)
+    const second = timer.half.value === 2 ? timer.currentMinute.value : 0
+    await matchStore.finishMatch(matchId, { firstHalfMinutes: first, secondHalfMinutes: second })
     router.push({ name: 'report', params: { id: matchId } })
   } finally {
     finishing.value = false
@@ -213,7 +224,7 @@ async function handleFinishMatch() {
       :away-team="matchStore.currentMatch?.awayTeam ?? ''"
       @start="timer.start()"
       @pause="timer.pause()"
-      @switch-half="timer.switchHalf()"
+      @switch-half="handleSwitchHalf"
       @reset="timer.reset()"
     />
 

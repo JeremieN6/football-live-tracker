@@ -24,6 +24,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/roster/:id',
+    name: 'player-profile',
+    component: () => import('@/views/PlayerProfileView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/match/:id/lineup',
     name: 'lineup',
     component: () => import('@/views/LineupView.vue'),

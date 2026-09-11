@@ -88,6 +88,9 @@ export interface Match {
   status: MatchStatus
   scoreHome: number
   scoreAway: number
+  // Durée de chaque mi-temps (minutes), renseignée à la fin du match — sert au calcul des minutes jouées
+  firstHalfMinutes: number | null
+  secondHalfMinutes: number | null
   createdBy: string
 }
 

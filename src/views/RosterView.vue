@@ -182,13 +182,18 @@ async function toggleActive(id: string, active: boolean) {
           class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/8"
           :class="{ 'opacity-50': !player.active }"
         >
-          <span class="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-neutral-300 shrink-0">
-            {{ player.number ?? '—' }}
-          </span>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-white font-medium truncate">{{ player.name }}</p>
-            <p v-if="player.position" class="text-xs text-neutral-500">{{ player.position }}</p>
-          </div>
+          <button
+            class="flex items-center gap-3 flex-1 min-w-0 text-left"
+            @click="router.push({ name: 'player-profile', params: { id: player.id } })"
+          >
+            <span class="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-neutral-300 shrink-0">
+              {{ player.number ?? '—' }}
+            </span>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-white font-medium truncate">{{ player.name }}</p>
+              <p v-if="player.position" class="text-xs text-neutral-500">{{ player.position }}</p>
+            </div>
+          </button>
           <button
             class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
             @click="startEdit(player.id)"

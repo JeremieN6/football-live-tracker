@@ -7,7 +7,8 @@ const router = useRouter()
 const playersStore = usePlayersStore()
 
 const name = ref('')
-const number = ref('')
+// Certains navigateurs renvoient une valeur numérique (et non une chaîne) via v-model sur un input type="number"
+const number = ref<string | number>('')
 const position = ref('')
 const editingId = ref<string | null>(null)
 const showArchived = ref(false)
@@ -44,9 +45,10 @@ async function handleSubmit() {
   errorMessage.value = null
   saving.value = true
   try {
+    const numberStr = String(number.value).trim()
     const payload = {
       name: name.value.trim(),
-      number: number.value.trim() ? Number(number.value.trim()) : null,
+      number: numberStr ? Number(numberStr) : null,
       position: position.value.trim() || null,
     }
     if (editingId.value) {

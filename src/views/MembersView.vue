@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useClubsStore } from '@/stores/clubs.store'
+import { useClubsStore, type MemberRole } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { useClubMembersStore } from '@/stores/clubMembers.store'
 import { extractErrorMessage } from '@/lib/errors'
@@ -11,8 +11,22 @@ const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
 const membersStore = useClubMembersStore()
 
+type InvitableRole = Exclude<MemberRole, 'OWNER'>
+
+const roleOptions: { value: InvitableRole; label: string; hint: string }[] = [
+  { value: 'COACH', label: 'Coach', hint: 'Accès complet (créer/modifier) sur ses équipes' },
+  { value: 'PLAYER', label: 'Joueur', hint: 'Lecture seule sur ses équipes' },
+  { value: 'OTHER', label: 'Autre', hint: 'Staff, lecture seule sur ses équipes' },
+]
+
+function roleLabel(role: MemberRole): string {
+  if (role === 'OWNER') return 'Propriétaire'
+  return roleOptions.find((r) => r.value === role)?.label ?? role
+}
+
 const showForm = ref(false)
 const email = ref('')
+const role = ref<InvitableRole>('COACH')
 const teamIds = ref<string[]>([])
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -49,6 +63,7 @@ const sortedMembers = computed(() =>
 
 function resetForm() {
   email.value = ''
+  role.value = 'COACH'
   teamIds.value = []
   errorMessage.value = null
   showForm.value = false
@@ -59,7 +74,7 @@ async function handleInvite() {
   errorMessage.value = null
   saving.value = true
   try {
-    await membersStore.inviteMember(clubsStore.club.id, { email: email.value, teamIds: teamIds.value })
+    await membersStore.inviteMember(clubsStore.club.id, { email: email.value, role: role.value, teamIds: teamIds.value })
     resetForm()
   } catch (err: unknown) {
     errorMessage.value = extractErrorMessage(err, 'Erreur lors de l\'invitation.')
@@ -106,7 +121,7 @@ async function handleRemove(id: string) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Inviter un coach
+          Inviter un membre
         </button>
 
         <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">
@@ -128,7 +143,7 @@ async function handleRemove(id: string) {
                 {{ member.invitedEmail ?? 'Vous' }}
               </p>
               <p class="text-xs text-neutral-500">
-                {{ member.role === 'OWNER' ? 'Propriétaire' : 'Coach' }} ·
+                {{ roleLabel(member.role) }} ·
                 {{ member.role === 'OWNER' ? 'Toutes les équipes' : teamNames(member.teamIds) }}
                 <span v-if="member.status === 'PENDING'" class="text-amber-400">· Invitation en attente</span>
               </p>
@@ -153,7 +168,7 @@ async function handleRemove(id: string) {
     >
       <div class="w-full max-w-md bg-neutral-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
         <div class="flex items-center justify-between mb-6">
-          <h2 class="text-lg font-semibold text-white">Inviter un coach</h2>
+          <h2 class="text-lg font-semibold text-white">Inviter un membre</h2>
           <button class="text-neutral-500 hover:text-white transition-colors p-1" @click="resetForm">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -174,6 +189,26 @@ async function handleRemove(id: string) {
             />
             <p class="text-xs text-neutral-600">
               Dès que cette personne se connecte avec cette adresse (compte existant ou nouveau), elle rejoint automatiquement l'équipe choisie.
+            </p>
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Rôle</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button
+                v-for="opt in roleOptions"
+                :key="opt.value"
+                type="button"
+                class="h-11 rounded-lg border text-sm font-medium transition-all"
+                :class="role === opt.value
+                  ? 'border-white/30 bg-white/10 text-white'
+                  : 'border-white/10 text-neutral-400 hover:border-white/20 hover:text-white'"
+                @click="role = opt.value"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <p class="text-xs text-neutral-600">
+              {{ roleOptions.find((r) => r.value === role)?.hint }}
             </p>
           </div>
           <div class="space-y-1">

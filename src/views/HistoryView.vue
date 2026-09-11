@@ -114,6 +114,7 @@ const hasFilteredMatches = computed(() => filteredMatches.value.length > 0)
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Matchs</h1>
         <button
+          v-if="clubsStore.canWrite"
           class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-white text-neutral-900 text-sm font-semibold
                  hover:bg-neutral-100 transition-all"
           @click="showCreateModal = true"
@@ -206,8 +207,11 @@ const hasFilteredMatches = computed(() => filteredMatches.value.length > 0)
           </svg>
         </div>
         <p class="text-neutral-400 font-medium mb-1">Aucun match pour l'instant</p>
-        <p class="text-sm text-neutral-600 mb-6">Créez votre premier match pour commencer l'analyse.</p>
+        <p class="text-sm text-neutral-600 mb-6">
+          {{ clubsStore.canWrite ? 'Créez votre premier match pour commencer l\'analyse.' : 'Aucun match créé pour le moment.' }}
+        </p>
         <button
+          v-if="clubsStore.canWrite"
           class="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-white text-neutral-900 text-sm font-semibold
                  hover:bg-neutral-100 transition-all"
           @click="showCreateModal = true"

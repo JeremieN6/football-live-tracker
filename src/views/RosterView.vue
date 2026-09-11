@@ -149,6 +149,7 @@ async function toggleActive(id: string, active: boolean) {
 
       <!-- Bouton d'ouverture du formulaire -->
       <button
+        v-if="clubsStore.canWrite"
         class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
                hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
         @click="showForm = true"
@@ -240,12 +241,14 @@ async function toggleActive(id: string, active: boolean) {
             </div>
           </button>
           <button
+            v-if="clubsStore.canWrite"
             class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
             @click="startEdit(player.id)"
           >
             Modifier
           </button>
           <button
+            v-if="clubsStore.canWrite"
             class="text-xs px-2 py-1 rounded-md transition-colors"
             :class="player.active ? 'text-red-400 hover:bg-red-500/10' : 'text-green-400 hover:bg-green-500/10'"
             @click="toggleActive(player.id, player.active)"

@@ -2,13 +2,14 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
 import { extractErrorMessage } from '@/lib/errors'
+import type { MemberRole } from '@/stores/clubs.store'
 
 export interface ClubMember {
   id: string
   clubId: string
   userId: string | null
   teamIds: string[]
-  role: 'OWNER' | 'COACH'
+  role: MemberRole
   invitedEmail: string | null
   status: 'PENDING' | 'ACTIVE'
   createdAt: string
@@ -67,8 +68,9 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
     }
   }
 
-  // Invite un coach par email sur une ou plusieurs équipes (status PENDING tant qu'il n'a pas de compte lié)
-  async function inviteMember(clubId: string, payload: { email: string; teamIds: string[] }) {
+  // Invite un membre par email, avec un rôle (coach/joueur/autre) sur une ou plusieurs
+  // équipes (status PENDING tant qu'il n'a pas de compte lié)
+  async function inviteMember(clubId: string, payload: { email: string; role: Exclude<MemberRole, 'OWNER'>; teamIds: string[] }) {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) throw new Error('Non authentifié.')
     if (payload.teamIds.length === 0) throw new Error('Sélectionnez au moins une équipe.')
@@ -77,7 +79,7 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
       .from('club_members')
       .insert({
         club_id: clubId,
-        role: 'COACH',
+        role: payload.role,
         status: 'PENDING',
         invited_email: payload.email.trim().toLowerCase(),
         invited_by: userData.user.id,

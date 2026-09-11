@@ -13,8 +13,10 @@ function rowToClub(row: Record<string, unknown>): Club {
   }
 }
 
+export type MemberRole = 'OWNER' | 'COACH' | 'PLAYER' | 'OTHER'
+
 export interface Membership {
-  role: 'OWNER' | 'COACH'
+  role: MemberRole
   teamIds: string[]
 }
 
@@ -25,6 +27,9 @@ export const useClubsStore = defineStore('clubs', () => {
   const error = ref<string | null>(null)
 
   const isOwner = computed(() => membership.value?.role === 'OWNER')
+  // Droit d'écriture (créer/modifier/supprimer) sur les équipes du membre :
+  // le OWNER (admin/futur président) et le COACH l'ont, PLAYER/OTHER sont en lecture seule.
+  const canWrite = computed(() => membership.value?.role === 'OWNER' || membership.value?.role === 'COACH')
 
   // Récupère le club de l'utilisateur :
   // - s'il est propriétaire d'un club, le renvoie (et le crée avec une équipe
@@ -140,5 +145,5 @@ export const useClubsStore = defineStore('clubs', () => {
     error.value = null
   }
 
-  return { club, membership, isOwner, loading, error, ensureClub, renameClub, reset }
+  return { club, membership, isOwner, canWrite, loading, error, ensureClub, renameClub, reset }
 })

@@ -108,8 +108,9 @@ async function handleDelete(id: string) {
 
     <div class="px-4 pt-5 max-w-2xl mx-auto">
 
-      <!-- Bouton d'ouverture du formulaire -->
+      <!-- Bouton d'ouverture du formulaire (propriétaire uniquement) -->
       <button
+        v-if="clubsStore.isOwner"
         class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
                hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
         @click="showForm = true"
@@ -148,12 +149,14 @@ async function handleDelete(id: string) {
               <p v-if="team.division" class="text-xs text-neutral-500">{{ team.division }}</p>
             </div>
             <button
+              v-if="clubsStore.isOwner"
               class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
               @click="startEdit(team.id)"
             >
               Modifier
             </button>
             <button
+              v-if="clubsStore.isOwner"
               class="text-xs text-red-400 hover:bg-red-500/10 px-2 py-1 rounded-md transition-colors"
               @click="handleDelete(team.id)"
             >

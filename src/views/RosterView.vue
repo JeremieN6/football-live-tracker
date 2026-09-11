@@ -34,6 +34,12 @@ onMounted(async () => {
   }
 })
 
+// Un coach non-propriétaire ne peut rattacher un joueur qu'à sa propre équipe
+const selectableTeams = computed(() => {
+  if (clubsStore.isOwner) return teamsStore.teams
+  return teamsStore.teams.filter((t) => t.id === clubsStore.membership?.teamId)
+})
+
 // Postes existants dans l'effectif, pour peupler le filtre
 const positions = computed(() => {
   const set = new Set(playersStore.players.map((p) => p.position).filter((p): p is string => !!p))
@@ -314,8 +320,8 @@ async function toggleActive(id: string, active: boolean) {
               class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
                      text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
             >
-              <option :value="null">Sans équipe</option>
-              <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">
+              <option v-if="clubsStore.isOwner" :value="null">Sans équipe</option>
+              <option v-for="t in selectableTeams" :key="t.id" :value="t.id">
                 {{ t.name }}<span v-if="t.division"> · {{ t.division }}</span>
               </option>
             </select>

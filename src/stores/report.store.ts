@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
+import { extractErrorMessage } from '@/lib/errors'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -152,7 +153,7 @@ export const useReportStore = defineStore('report', () => {
       if (sbError) throw sbError
       report.value = data ? rowToReport(data as Record<string, unknown>) : null
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Erreur lors du chargement du rapport.'
+      error.value = extractErrorMessage(err, 'Erreur lors du chargement du rapport.')
     } finally {
       loading.value = false
     }

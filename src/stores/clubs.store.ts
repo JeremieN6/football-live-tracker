@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { Club } from '@/types/match.types'
+import { extractErrorMessage } from '@/lib/errors'
 
 function rowToClub(row: Record<string, unknown>): Club {
   return {
@@ -35,6 +36,19 @@ export const useClubsStore = defineStore('clubs', () => {
 
       if (existing) {
         club.value = rowToClub(existing)
+        // Auto-réparation : un club sans aucune équipe (ex. suite à une migration ou un aléa)
+        // ne doit pas rester bloqué sans équipe par défaut.
+        const { count: teamCount, error: countError } = await supabase
+          .from('teams')
+          .select('id', { count: 'exact', head: true })
+          .eq('club_id', existing.id)
+        if (countError) throw countError
+        if (!teamCount) {
+          const { error: teamError } = await supabase
+            .from('teams')
+            .insert({ club_id: existing.id, name: 'Équipe 1' })
+          if (teamError) throw teamError
+        }
         return club.value
       }
 
@@ -59,7 +73,7 @@ export const useClubsStore = defineStore('clubs', () => {
       club.value = rowToClub(newClub)
       return club.value
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Erreur lors du chargement du club.'
+      error.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
       throw err
     } finally {
       loading.value = false

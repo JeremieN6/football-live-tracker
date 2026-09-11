@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
+import { extractErrorMessage } from '@/lib/errors'
 
 const router = useRouter()
 const clubsStore = useClubsStore()
@@ -15,8 +16,12 @@ const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
 onMounted(async () => {
-  const club = await clubsStore.ensureClub()
-  await teamsStore.fetchTeams(club.id)
+  try {
+    const club = await clubsStore.ensureClub()
+    await teamsStore.fetchTeams(club.id)
+  } catch (err: unknown) {
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
+  }
 })
 
 function startEdit(id: string) {
@@ -47,7 +52,7 @@ async function handleSubmit() {
     }
     resetForm()
   } catch (err: unknown) {
-    errorMessage.value = err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement.'
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors de l\'enregistrement.')
   } finally {
     saving.value = false
   }

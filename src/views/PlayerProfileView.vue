@@ -19,13 +19,17 @@ const player = ref<Player | null>(null)
 
 onMounted(async () => {
   profileStore.reset()
-  const club = await clubsStore.ensureClub()
-  await Promise.all([
-    playersStore.players.length === 0 ? playersStore.fetchPlayers() : Promise.resolve(),
-    teamsStore.fetchTeams(club.id),
-  ])
-  player.value = playersStore.players.find((p) => p.id === playerId) ?? null
-  await profileStore.fetchProfile(playerId, player.value?.teamId ?? null)
+  try {
+    const club = await clubsStore.ensureClub()
+    await Promise.all([
+      playersStore.players.length === 0 ? playersStore.fetchPlayers() : Promise.resolve(),
+      teamsStore.fetchTeams(club.id),
+    ])
+    player.value = playersStore.players.find((p) => p.id === playerId) ?? null
+    await profileStore.fetchProfile(playerId, player.value?.teamId ?? null)
+  } catch {
+    // clubsStore.error / profileStore.error portent déjà le message, affiché dans le template
+  }
 })
 
 function teamName(teamId: string | null): string {
@@ -66,6 +70,10 @@ function statusLabel(role: string, enteredAsSub: boolean): string {
     </div>
 
     <div class="px-4 pt-5 max-w-2xl mx-auto">
+
+      <p v-if="clubsStore.error || profileStore.error" class="mb-4 text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+        {{ clubsStore.error || profileStore.error }}
+      </p>
 
       <div v-if="profileStore.loading" class="flex items-center justify-center py-16">
         <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { Player } from '@/types/match.types'
+import { extractErrorMessage } from '@/lib/errors'
 
 // Mapping snake_case BDD → camelCase TypeScript
 function rowToPlayer(row: Record<string, unknown>): Player {
@@ -36,7 +37,7 @@ export const usePlayersStore = defineStore('players', () => {
       if (sbError) throw sbError
       players.value = (data ?? []).map(rowToPlayer)
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Erreur lors du chargement de l\'effectif.'
+      error.value = extractErrorMessage(err, 'Erreur lors du chargement de l\'effectif.')
     } finally {
       loading.value = false
     }

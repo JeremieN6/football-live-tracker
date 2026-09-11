@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { Match, MatchStatus } from '@/types/match.types'
+import { extractErrorMessage } from '@/lib/errors'
 
 // Mapping snake_case BDD → camelCase TypeScript
 function rowToMatch(row: Record<string, unknown>): Match {
@@ -42,7 +43,7 @@ export const useMatchStore = defineStore('match', () => {
       if (sbError) throw sbError
       matches.value = (data ?? []).map(rowToMatch)
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Erreur lors du chargement des matchs.'
+      error.value = extractErrorMessage(err, 'Erreur lors du chargement des matchs.')
     } finally {
       loading.value = false
     }
@@ -63,7 +64,7 @@ export const useMatchStore = defineStore('match', () => {
       if (sbError) throw sbError
       currentMatch.value = rowToMatch(data)
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Match introuvable.'
+      error.value = extractErrorMessage(err, 'Match introuvable.')
     } finally {
       loading.value = false
     }

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { usePlayersStore } from '@/stores/players.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
+import { extractErrorMessage } from '@/lib/errors'
 
 const router = useRouter()
 const playersStore = usePlayersStore()
@@ -22,8 +23,12 @@ const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
 onMounted(async () => {
-  const club = await clubsStore.ensureClub()
-  await Promise.all([playersStore.fetchPlayers(), teamsStore.fetchTeams(club.id)])
+  try {
+    const club = await clubsStore.ensureClub()
+    await Promise.all([playersStore.fetchPlayers(), teamsStore.fetchTeams(club.id)])
+  } catch (err: unknown) {
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
+  }
 })
 
 const visiblePlayers = computed(() => {
@@ -87,7 +92,7 @@ async function handleSubmit() {
     }
     resetForm()
   } catch (err: unknown) {
-    errorMessage.value = err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement.'
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors de l\'enregistrement.')
   } finally {
     saving.value = false
   }

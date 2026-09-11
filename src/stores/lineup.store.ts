@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { LineupEntry, LineupRole } from '@/types/match.types'
+import { extractErrorMessage } from '@/lib/errors'
 
 // Mapping snake_case BDD → camelCase TypeScript
 function rowToEntry(row: Record<string, unknown>): LineupEntry {
@@ -33,7 +34,7 @@ export const useLineupStore = defineStore('lineup', () => {
       if (sbError) throw sbError
       entries.value = (data ?? []).map(rowToEntry)
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Erreur lors du chargement de l\'effectif du match.'
+      error.value = extractErrorMessage(err, 'Erreur lors du chargement de l\'effectif du match.')
     } finally {
       loading.value = false
     }

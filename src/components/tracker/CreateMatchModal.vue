@@ -4,6 +4,7 @@ import { useMatchStore } from '@/stores/match.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { useRouter } from 'vue-router'
+import { extractErrorMessage } from '@/lib/errors'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -22,9 +23,13 @@ const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 
 onMounted(async () => {
-  const club = await clubsStore.ensureClub()
-  await teamsStore.fetchTeams(club.id)
-  if (teamsStore.teams.length === 1) teamId.value = teamsStore.teams[0].id
+  try {
+    const club = await clubsStore.ensureClub()
+    await teamsStore.fetchTeams(club.id)
+    if (teamsStore.teams.length === 1) teamId.value = teamsStore.teams[0].id
+  } catch (err: unknown) {
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
+  }
 })
 
 async function handleSubmit() {
@@ -44,7 +49,7 @@ async function handleSubmit() {
     emit('close')
     await router.push({ name: 'lineup', params: { id: match.id } })
   } catch (err: unknown) {
-    errorMessage.value = err instanceof Error ? err.message : 'Erreur lors de la création.'
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors de la création.')
   } finally {
     loading.value = false
   }

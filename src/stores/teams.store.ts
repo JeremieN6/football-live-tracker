@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { ClubTeam } from '@/types/match.types'
+import { extractErrorMessage } from '@/lib/errors'
 
 function rowToTeam(row: Record<string, unknown>): ClubTeam {
   return {
@@ -30,7 +31,7 @@ export const useTeamsStore = defineStore('teams', () => {
       if (sbError) throw sbError
       teams.value = (data ?? []).map(rowToTeam)
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Erreur lors du chargement des équipes.'
+      error.value = extractErrorMessage(err, 'Erreur lors du chargement des équipes.')
     } finally {
       loading.value = false
     }

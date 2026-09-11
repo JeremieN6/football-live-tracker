@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { MatchEvent, EventType, Team, Half, ZoneX, ZoneY } from '@/types/match.types'
+import { extractErrorMessage } from '@/lib/errors'
 
 // Mapping snake_case BDD → camelCase TypeScript
 function rowToEvent(row: Record<string, unknown>): MatchEvent {
@@ -51,7 +52,7 @@ export const useEventsStore = defineStore('events', () => {
       if (sbError) throw sbError
       events.value = (data ?? []).map(rowToEvent)
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Erreur lors du chargement des événements.'
+      error.value = extractErrorMessage(err, 'Erreur lors du chargement des événements.')
     } finally {
       loading.value = false
     }

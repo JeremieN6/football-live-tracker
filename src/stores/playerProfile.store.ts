@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { LineupRole, Match, MatchEvent } from '@/types/match.types'
+import { extractErrorMessage } from '@/lib/errors'
 
 interface MatchAppearance {
   match: Match
@@ -144,7 +145,7 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
         })
         .sort((a, b) => b.match.date.localeCompare(a.match.date))
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Erreur lors du chargement du profil joueur.'
+      error.value = extractErrorMessage(err, 'Erreur lors du chargement du profil joueur.')
     } finally {
       loading.value = false
     }

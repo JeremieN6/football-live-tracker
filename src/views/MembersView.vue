@@ -233,7 +233,7 @@ async function handleRemove(id: string) {
             </div>
             <p v-if="teamsStore.teams.length === 0" class="text-xs text-neutral-600">
               Aucune équipe créée pour le moment —
-              <button type="button" class="underline hover:text-white" @click="router.push({ name: 'teams' })">en créer une</button>
+              <button type="button" class="underline hover:text-white" @click="router.push({ name: 'club', query: { tab: 'teams' } })">en créer une</button>
             </p>
           </div>
 

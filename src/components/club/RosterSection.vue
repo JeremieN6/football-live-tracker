@@ -6,6 +6,8 @@ import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { extractErrorMessage } from '@/lib/errors'
 
+const emit = defineEmits<{ 'go-teams': [] }>()
+
 const router = useRouter()
 const playersStore = usePlayersStore()
 const clubsStore = useClubsStore()
@@ -124,138 +126,115 @@ async function toggleActive(id: string, active: boolean) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-950 text-white pb-20">
+  <div>
+    <!-- Bouton d'ouverture du formulaire -->
+    <button
+      v-if="clubsStore.canWrite"
+      class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
+             hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
+      @click="showForm = true"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      Ajouter un joueur
+    </button>
 
-    <!-- Header -->
-    <div class="sticky top-0 z-30 bg-neutral-950/80 backdrop-blur-sm border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <button
-        class="text-neutral-500 hover:text-white transition-colors p-1 -ml-1"
-        @click="router.push({ name: 'history' })"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-          <path d="m15 18-6-6 6-6" />
-        </svg>
-      </button>
-      <h1 class="text-sm font-semibold text-white flex-1">Effectif du club</h1>
-      <button
-        class="text-xs text-neutral-500 hover:text-white transition-colors"
-        @click="router.push({ name: 'teams' })"
-      >
-        Gérer les équipes
-      </button>
+    <!-- Recherche -->
+    <div class="relative mb-3">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m21 21-4.3-4.3" />
+      </svg>
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Rechercher un joueur par nom..."
+        class="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
+               text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+      />
     </div>
 
-    <div class="px-4 pt-5 max-w-2xl mx-auto">
-
-      <!-- Bouton d'ouverture du formulaire -->
-      <button
-        v-if="clubsStore.canWrite"
-        class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
-               hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
-        @click="showForm = true"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        Ajouter un joueur
-      </button>
-
-      <!-- Recherche -->
-      <div class="relative mb-3">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m21 21-4.3-4.3" />
-        </svg>
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Rechercher un joueur par nom..."
-          class="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
-                 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
-        />
-      </div>
-
-      <!-- Filtres -->
-      <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
-        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
-          Joueurs ({{ visiblePlayers.length }})
-        </h2>
-        <div class="flex items-center gap-2 flex-wrap">
-          <select
-            v-model="filterTeamId"
-            class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
-                   focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
-          >
-            <option value="ALL">Toutes les équipes</option>
-            <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">{{ t.name }}</option>
-          </select>
-          <select
-            v-if="positions.length > 0"
-            v-model="filterPosition"
-            class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
-                   focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
-          >
-            <option value="ALL">Tous les postes</option>
-            <option v-for="pos in positions" :key="pos" :value="pos">{{ pos }}</option>
-          </select>
-          <button
-            class="text-xs text-neutral-600 hover:text-neutral-400 transition-colors whitespace-nowrap"
-            @click="showArchived = !showArchived"
-          >
-            {{ showArchived ? 'Masquer les archivés' : 'Voir les archivés' }}
-          </button>
-        </div>
-      </div>
-
-      <div v-if="playersStore.loading" class="flex items-center justify-center py-10">
-        <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-      </div>
-
-      <p v-else-if="visiblePlayers.length === 0 && playersStore.players.length === 0" class="text-sm text-neutral-600 text-center py-8">
-        Aucun joueur pour le moment. Ajoutez votre effectif ci-dessus.
-      </p>
-
-      <p v-else-if="visiblePlayers.length === 0" class="text-sm text-neutral-600 text-center py-8">
-        Aucun joueur ne correspond à cette recherche.
-      </p>
-
-      <div v-else class="space-y-1.5">
-        <div
-          v-for="player in visiblePlayers"
-          :key="player.id"
-          class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/8"
-          :class="{ 'opacity-50': !player.active }"
+    <!-- Filtres -->
+    <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+      <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
+        Joueurs ({{ visiblePlayers.length }})
+      </h2>
+      <div class="flex items-center gap-2 flex-wrap">
+        <select
+          v-model="filterTeamId"
+          class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
+                 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
         >
-          <button
-            class="flex items-center gap-3 flex-1 min-w-0 text-left"
-            @click="router.push({ name: 'player-profile', params: { id: player.id } })"
-          >
-            <span class="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-neutral-300 shrink-0">
-              {{ player.number ?? '—' }}
-            </span>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm text-white font-medium truncate">{{ player.name }}</p>
-              <p class="text-xs text-neutral-500 truncate">
-                {{ teamName(player.teamId) }}<span v-if="player.position"> · {{ player.position }}</span>
-              </p>
-            </div>
-          </button>
-          <button
-            v-if="clubsStore.canWrite"
-            class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
-            @click="startEdit(player.id)"
-          >
-            Modifier
-          </button>
-          <button
-            v-if="clubsStore.canWrite"
-            class="text-xs px-2 py-1 rounded-md transition-colors"
-            :class="player.active ? 'text-red-400 hover:bg-red-500/10' : 'text-green-400 hover:bg-green-500/10'"
-            @click="toggleActive(player.id, player.active)"
-          >
-            {{ player.active ? 'Archiver' : 'Réactiver' }}
-          </button>
-        </div>
+          <option value="ALL">Toutes les équipes</option>
+          <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">{{ t.name }}</option>
+        </select>
+        <select
+          v-if="positions.length > 0"
+          v-model="filterPosition"
+          class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
+                 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
+        >
+          <option value="ALL">Tous les postes</option>
+          <option v-for="pos in positions" :key="pos" :value="pos">{{ pos }}</option>
+        </select>
+        <button
+          class="text-xs text-neutral-600 hover:text-neutral-400 transition-colors whitespace-nowrap"
+          @click="showArchived = !showArchived"
+        >
+          {{ showArchived ? 'Masquer les archivés' : 'Voir les archivés' }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="playersStore.loading" class="flex items-center justify-center py-10">
+      <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+    </div>
+
+    <p v-else-if="visiblePlayers.length === 0 && playersStore.players.length === 0" class="text-sm text-neutral-600 text-center py-8">
+      Aucun joueur pour le moment. Ajoutez votre effectif ci-dessus.
+    </p>
+
+    <p v-else-if="visiblePlayers.length === 0" class="text-sm text-neutral-600 text-center py-8">
+      Aucun joueur ne correspond à cette recherche.
+    </p>
+
+    <div v-else class="space-y-1.5">
+      <div
+        v-for="player in visiblePlayers"
+        :key="player.id"
+        class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/8"
+        :class="{ 'opacity-50': !player.active }"
+      >
+        <button
+          class="flex items-center gap-3 flex-1 min-w-0 text-left"
+          @click="router.push({ name: 'player-profile', params: { id: player.id } })"
+        >
+          <span class="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-neutral-300 shrink-0">
+            {{ player.number ?? '—' }}
+          </span>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-white font-medium truncate">{{ player.name }}</p>
+            <p class="text-xs text-neutral-500 truncate">
+              {{ teamName(player.teamId) }}<span v-if="player.position"> · {{ player.position }}</span>
+            </p>
+          </div>
+        </button>
+        <button
+          v-if="clubsStore.canWrite"
+          class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
+          @click="startEdit(player.id)"
+        >
+          Modifier
+        </button>
+        <button
+          v-if="clubsStore.canWrite"
+          class="text-xs px-2 py-1 rounded-md transition-colors"
+          :class="player.active ? 'text-red-400 hover:bg-red-500/10' : 'text-green-400 hover:bg-green-500/10'"
+          @click="toggleActive(player.id, player.active)"
+        >
+          {{ player.active ? 'Archiver' : 'Réactiver' }}
+        </button>
       </div>
     </div>
 
@@ -330,7 +309,7 @@ async function toggleActive(id: string, active: boolean) {
             </select>
             <p v-if="teamsStore.teams.length === 0" class="text-xs text-neutral-600">
               Aucune équipe créée pour le moment —
-              <button type="button" class="underline hover:text-white" @click="router.push({ name: 'teams' })">en créer une</button>
+              <button type="button" class="underline hover:text-white" @click="emit('go-teams')">en créer une</button>
             </p>
           </div>
 

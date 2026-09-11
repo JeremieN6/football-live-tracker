@@ -3,11 +3,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
+import { useMatchStore } from '@/stores/match.store'
 import { extractErrorMessage } from '@/lib/errors'
 
 const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
 const playersStore = usePlayersStore()
+const matchStore = useMatchStore()
 
 const name = ref('')
 const division = ref('')
@@ -21,11 +23,45 @@ const errorMessage = ref<string | null>(null)
 onMounted(async () => {
   try {
     const club = await clubsStore.ensureClub()
-    await Promise.all([teamsStore.fetchTeams(club.id), playersStore.fetchPlayers()])
+    await Promise.all([teamsStore.fetchTeams(club.id), playersStore.fetchPlayers(), matchStore.fetchMatches()])
   } catch (err: unknown) {
     errorMessage.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
   }
 })
+
+// Stats agrégées par équipe, calculées à la volée depuis les matchs terminés
+// (score "pour" = GOAL_FOR, score "contre" = GOAL_AGAINST, indépendamment de
+// qui joue à domicile/extérieur — voir TrackerView.vue).
+interface TeamStats {
+  played: number
+  wins: number
+  draws: number
+  losses: number
+  goalsFor: number
+  goalsAgainst: number
+}
+
+const statsByTeam = computed(() => {
+  const map = new Map<string, TeamStats>()
+  for (const m of matchStore.matches) {
+    if (m.status !== 'FINISHED' || !m.teamId) continue
+    const stats = map.get(m.teamId) ?? { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 }
+    stats.played += 1
+    stats.goalsFor += m.scoreHome
+    stats.goalsAgainst += m.scoreAway
+    if (m.scoreHome > m.scoreAway) stats.wins += 1
+    else if (m.scoreHome < m.scoreAway) stats.losses += 1
+    else stats.draws += 1
+    map.set(m.teamId, stats)
+  }
+  return map
+})
+
+const emptyStats: TeamStats = { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 }
+
+function teamStats(teamId: string): TeamStats {
+  return statsByTeam.value.get(teamId) ?? emptyStats
+}
 
 // Joueurs actifs par équipe, calculé depuis l'effectif (pas stocké)
 const playersByTeam = computed(() => {
@@ -156,6 +192,14 @@ async function handleDelete(id: string) {
             Supprimer
           </button>
         </div>
+
+        <!-- Stats agrégées (matchs terminés uniquement) -->
+        <p v-if="teamStats(team.id).played > 0" class="text-xs text-neutral-500 mt-1.5">
+          🏆 {{ teamStats(team.id).played }} match{{ teamStats(team.id).played > 1 ? 's' : '' }} ·
+          {{ teamStats(team.id).wins }}V {{ teamStats(team.id).draws }}N {{ teamStats(team.id).losses }}D ·
+          {{ teamStats(team.id).goalsFor }}-{{ teamStats(team.id).goalsAgainst }} buts
+        </p>
+
         <button
           type="button"
           class="w-full flex items-center gap-3 mt-2 pt-2 border-t border-white/5 text-left"

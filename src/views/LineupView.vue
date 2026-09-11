@@ -107,7 +107,7 @@ function handleSkip() {
         <p class="text-sm text-neutral-400 mb-4">Votre effectif de club est vide.</p>
         <button
           class="h-11 px-6 rounded-xl bg-white text-neutral-900 text-sm font-semibold hover:bg-neutral-100 transition-all"
-          @click="router.push({ name: 'roster' })"
+          @click="router.push({ name: 'club', query: { tab: 'roster' } })"
         >
           Créer l'effectif
         </button>

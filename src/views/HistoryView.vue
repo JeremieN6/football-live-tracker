@@ -97,15 +97,9 @@ const hasFilteredMatches = computed(() => filteredMatches.value.length > 0)
           </button>
           <button
             class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
-            @click="router.push({ name: 'teams' })"
+            @click="router.push({ name: 'club' })"
           >
-            Équipes
-          </button>
-          <button
-            class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
-            @click="router.push({ name: 'roster' })"
-          >
-            Effectif
+            {{ clubsStore.club?.name ?? 'Mon club' }}
           </button>
           <button
             class="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"

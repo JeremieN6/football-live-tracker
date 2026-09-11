@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { extractErrorMessage } from '@/lib/errors'
 
-const router = useRouter()
 const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
 const playersStore = usePlayersStore()
@@ -102,105 +100,88 @@ async function handleDelete(id: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-950 text-white pb-20">
+  <div>
+    <!-- Bouton d'ouverture du formulaire (propriétaire uniquement) -->
+    <button
+      v-if="clubsStore.isOwner"
+      class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
+             hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
+      @click="showForm = true"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      Créer une équipe
+    </button>
 
-    <!-- Header -->
-    <div class="sticky top-0 z-30 bg-neutral-950/80 backdrop-blur-sm border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <button
-        class="text-neutral-500 hover:text-white transition-colors p-1 -ml-1"
-        @click="router.push({ name: 'history' })"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-          <path d="m15 18-6-6 6-6" />
-        </svg>
-      </button>
-      <h1 class="text-sm font-semibold text-white">{{ clubsStore.club?.name ?? 'Équipes du club' }}</h1>
+    <!-- Liste équipes -->
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">
+      Équipes ({{ teamsStore.teams.length }})
+    </h2>
+
+    <div v-if="teamsStore.loading" class="flex items-center justify-center py-10">
+      <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
     </div>
 
-    <div class="px-4 pt-5 max-w-2xl mx-auto">
+    <p v-else-if="teamsStore.teams.length === 0" class="text-sm text-neutral-600 text-center py-8">
+      Aucune équipe pour le moment.
+    </p>
 
-      <!-- Bouton d'ouverture du formulaire (propriétaire uniquement) -->
-      <button
-        v-if="clubsStore.isOwner"
-        class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
-               hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
-        @click="showForm = true"
+    <div v-else class="space-y-1.5">
+      <div
+        v-for="team in teamsStore.teams"
+        :key="team.id"
+        class="px-3 py-2.5 rounded-xl bg-white/5 border border-white/8"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        Créer une équipe
-      </button>
-
-      <!-- Liste équipes -->
-      <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">
-        Équipes ({{ teamsStore.teams.length }})
-      </h2>
-
-      <div v-if="teamsStore.loading" class="flex items-center justify-center py-10">
-        <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-      </div>
-
-      <p v-else-if="teamsStore.teams.length === 0" class="text-sm text-neutral-600 text-center py-8">
-        Aucune équipe pour le moment.
-      </p>
-
-      <div v-else class="space-y-1.5">
-        <div
-          v-for="team in teamsStore.teams"
-          :key="team.id"
-          class="px-3 py-2.5 rounded-xl bg-white/5 border border-white/8"
-        >
-          <div class="flex items-center gap-3">
-            <div class="flex-1 min-w-0">
-              <p class="text-sm text-white font-medium truncate">
-                {{ team.name }}
-                <span v-if="team.category" class="text-neutral-500 font-normal">· {{ team.category }}</span>
-              </p>
-              <p v-if="team.division" class="text-xs text-neutral-500">{{ team.division }}</p>
-            </div>
-            <button
-              v-if="clubsStore.isOwner"
-              class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
-              @click="startEdit(team.id)"
-            >
-              Modifier
-            </button>
-            <button
-              v-if="clubsStore.isOwner"
-              class="text-xs text-red-400 hover:bg-red-500/10 px-2 py-1 rounded-md transition-colors"
-              @click="handleDelete(team.id)"
-            >
-              Supprimer
-            </button>
+        <div class="flex items-center gap-3">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-white font-medium truncate">
+              {{ team.name }}
+              <span v-if="team.category" class="text-neutral-500 font-normal">· {{ team.category }}</span>
+            </p>
+            <p v-if="team.division" class="text-xs text-neutral-500">{{ team.division }}</p>
           </div>
           <button
-            type="button"
-            class="w-full flex items-center gap-3 mt-2 pt-2 border-t border-white/5 text-left"
-            @click="toggleRoster(team.id)"
+            v-if="clubsStore.isOwner"
+            class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
+            @click="startEdit(team.id)"
           >
-            <span class="text-xs text-neutral-400">
-              👤 {{ teamPlayers(team.id).length }} joueur{{ teamPlayers(team.id).length > 1 ? 's' : '' }}
-            </span>
-            <span v-if="team.formation" class="text-xs text-neutral-400">⚽ {{ team.formation }}</span>
-            <span class="text-xs text-neutral-600 ml-auto">
-              {{ expandedTeamId === team.id ? 'Masquer ▲' : 'Voir l\'effectif ▼' }}
-            </span>
+            Modifier
           </button>
+          <button
+            v-if="clubsStore.isOwner"
+            class="text-xs text-red-400 hover:bg-red-500/10 px-2 py-1 rounded-md transition-colors"
+            @click="handleDelete(team.id)"
+          >
+            Supprimer
+          </button>
+        </div>
+        <button
+          type="button"
+          class="w-full flex items-center gap-3 mt-2 pt-2 border-t border-white/5 text-left"
+          @click="toggleRoster(team.id)"
+        >
+          <span class="text-xs text-neutral-400">
+            👤 {{ teamPlayers(team.id).length }} joueur{{ teamPlayers(team.id).length > 1 ? 's' : '' }}
+          </span>
+          <span v-if="team.formation" class="text-xs text-neutral-400">⚽ {{ team.formation }}</span>
+          <span class="text-xs text-neutral-600 ml-auto">
+            {{ expandedTeamId === team.id ? 'Masquer ▲' : 'Voir l\'effectif ▼' }}
+          </span>
+        </button>
 
-          <div v-if="expandedTeamId === team.id" class="mt-2 pt-2 border-t border-white/5">
-            <p v-if="teamPlayers(team.id).length === 0" class="text-xs text-neutral-600">
-              Aucun joueur assigné à cette équipe pour le moment.
-            </p>
-            <div v-else class="flex flex-wrap gap-1.5">
-              <span
-                v-for="p in teamPlayers(team.id)"
-                :key="p.id"
-                class="text-xs text-neutral-300 bg-white/5 border border-white/10 rounded-full px-2.5 py-1"
-              >
-                {{ p.name }}<span v-if="p.position" class="text-neutral-500"> · {{ p.position }}</span>
-              </span>
-            </div>
+        <div v-if="expandedTeamId === team.id" class="mt-2 pt-2 border-t border-white/5">
+          <p v-if="teamPlayers(team.id).length === 0" class="text-xs text-neutral-600">
+            Aucun joueur assigné à cette équipe pour le moment.
+          </p>
+          <div v-else class="flex flex-wrap gap-1.5">
+            <span
+              v-for="p in teamPlayers(team.id)"
+              :key="p.id"
+              class="text-xs text-neutral-300 bg-white/5 border border-white/10 rounded-full px-2.5 py-1"
+            >
+              {{ p.name }}<span v-if="p.position" class="text-neutral-500"> · {{ p.position }}</span>
+            </span>
           </div>
         </div>
       </div>

@@ -102,7 +102,7 @@ async function handleRemove(id: string) {
           <path d="m15 18-6-6 6-6" />
         </svg>
       </button>
-      <h1 class="text-sm font-semibold text-white">Membres du club</h1>
+      <h1 class="text-sm font-semibold text-white">Membres de {{ clubsStore.club?.name ?? 'votre club' }}</h1>
     </div>
 
     <div class="px-4 pt-5 max-w-2xl mx-auto">
@@ -233,7 +233,7 @@ async function handleRemove(id: string) {
             </div>
             <p v-if="teamsStore.teams.length === 0" class="text-xs text-neutral-600">
               Aucune équipe créée pour le moment —
-              <button type="button" class="underline hover:text-white" @click="router.push({ name: 'teams' })">en créer une</button>
+              <button type="button" class="underline hover:text-white" @click="router.push({ name: 'club', query: { tab: 'teams' } })">en créer une</button>
             </p>
           </div>
 

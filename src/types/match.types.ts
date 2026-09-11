@@ -71,10 +71,13 @@ export interface Player {
   createdAt: string
 }
 
+export type ClubStatus = 'PENDING' | 'ACTIVE'
+
 export interface Club {
   id: string
   name: string
   ownerId: string
+  status: ClubStatus
   createdAt: string
 }
 

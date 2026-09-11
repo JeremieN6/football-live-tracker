@@ -9,6 +9,7 @@ function rowToClub(row: Record<string, unknown>): Club {
     id: row.id as string,
     name: row.name as string,
     ownerId: row.owner_id as string,
+    status: row.status as Club['status'],
     createdAt: row.created_at as string,
   }
 }

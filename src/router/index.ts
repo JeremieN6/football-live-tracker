@@ -12,6 +12,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/AuthView.vue'),
   },
   {
+    path: '/pending',
+    name: 'pending',
+    component: () => import('@/views/PendingApprovalView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/history',
     name: 'history',
     component: () => import('@/views/HistoryView.vue'),
@@ -66,7 +72,8 @@ const router = createRouter({
   routes,
 })
 
-// Guard : redirige vers /auth si non connecté
+// Guard : redirige vers /auth si non connecté, vers /pending si le club
+// de l'utilisateur n'est pas encore validé par l'administrateur.
 router.beforeEach(async (to) => {
   if (!to.meta.requiresAuth) return true
 
@@ -76,6 +83,22 @@ router.beforeEach(async (to) => {
 
   if (!authStore.user) {
     return { name: 'auth' }
+  }
+
+  if (to.name === 'pending') return true
+
+  const { useClubsStore } = await import('@/stores/clubs.store')
+  const clubsStore = useClubsStore()
+  if (!clubsStore.club) {
+    try {
+      await clubsStore.ensureClub()
+    } catch {
+      // Laisse la vue cible gérer/afficher l'erreur, comme avant ce guard.
+      return true
+    }
+  }
+  if (clubsStore.club?.status === 'PENDING') {
+    return { name: 'pending' }
   }
 
   return true

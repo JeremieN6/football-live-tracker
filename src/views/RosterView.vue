@@ -17,6 +17,7 @@ const number = ref<string | number>('')
 const position = ref('')
 const teamId = ref<string | null>(null)
 const editingId = ref<string | null>(null)
+const showForm = ref(false)
 const showArchived = ref(false)
 const filterTeamId = ref<string | 'ALL'>('ALL')
 const filterPosition = ref<string | 'ALL'>('ALL')
@@ -68,6 +69,7 @@ function startEdit(id: string) {
   number.value = player.number != null ? String(player.number) : ''
   position.value = player.position ?? ''
   teamId.value = player.teamId
+  showForm.value = true
 }
 
 function resetForm() {
@@ -77,6 +79,7 @@ function resetForm() {
   position.value = ''
   teamId.value = null
   errorMessage.value = null
+  showForm.value = false
 }
 
 async function handleSubmit() {
@@ -138,8 +141,33 @@ async function toggleActive(id: string, active: boolean) {
 
     <div class="px-4 pt-5 max-w-2xl mx-auto">
 
+      <!-- Bouton d'ouverture du formulaire -->
+      <button
+        v-if="!showForm"
+        class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
+               hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
+        @click="showForm = true"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Ajouter un joueur
+      </button>
+
       <!-- Formulaire ajout / édition -->
-      <form class="bg-white/5 border border-white/8 rounded-2xl p-4 mb-6 space-y-3" @submit.prevent="handleSubmit">
+      <form v-else class="bg-white/5 border border-white/8 rounded-2xl p-4 mb-6 space-y-3" @submit.prevent="handleSubmit">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white">{{ editingId ? 'Modifier le joueur' : 'Nouveau joueur' }}</h2>
+          <button
+            type="button"
+            class="text-neutral-500 hover:text-white transition-colors p-1 -mr-1"
+            @click="resetForm"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         <div class="grid grid-cols-[1fr_auto] gap-3">
           <div class="space-y-1">
             <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Nom</label>

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMatchStore } from '@/stores/match.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useLineupStore } from '@/stores/lineup.store'
+import { useClubsStore } from '@/stores/clubs.store'
 import type { LineupRole } from '@/types/match.types'
 import { extractErrorMessage } from '@/lib/errors'
 
@@ -12,6 +13,7 @@ const router = useRouter()
 const matchStore = useMatchStore()
 const playersStore = usePlayersStore()
 const lineupStore = useLineupStore()
+const clubsStore = useClubsStore()
 
 const matchId = route.params.id as string
 
@@ -41,6 +43,7 @@ function roleOf(playerId: string): LineupRole | null {
 
 // Cycle : non sélectionné → titulaire → remplaçant → non sélectionné
 function cycleRole(playerId: string) {
+  if (!clubsStore.canWrite) return
   const current = roleOf(playerId)
   const next = current === null ? 'STARTER' : current === 'STARTER' ? 'SUB' : null
   const map = new Map(selection.value)
@@ -94,8 +97,11 @@ function handleSkip() {
         </span>
       </div>
 
-      <p class="text-xs text-neutral-600 mb-4">
+      <p v-if="clubsStore.canWrite" class="text-xs text-neutral-600 mb-4">
         Touchez un joueur pour le passer titulaire, puis remplaçant, puis le désélectionner.
+      </p>
+      <p v-else class="text-xs text-neutral-600 bg-white/5 border border-white/10 rounded-lg px-3 py-2 mb-4">
+        Lecture seule — vous n'avez pas les droits pour modifier la composition de ce match.
       </p>
 
       <div v-if="playersStore.loading" class="flex items-center justify-center py-10">
@@ -106,6 +112,7 @@ function handleSkip() {
       <div v-else-if="activePlayers.length === 0" class="text-center py-10">
         <p class="text-sm text-neutral-400 mb-4">Votre effectif de club est vide.</p>
         <button
+          v-if="clubsStore.canWrite"
           class="h-11 px-6 rounded-xl bg-white text-neutral-900 text-sm font-semibold hover:bg-neutral-100 transition-all"
           @click="router.push({ name: 'club', query: { tab: 'roster' } })"
         >
@@ -151,21 +158,30 @@ function handleSkip() {
     <!-- Actions fixes en bas -->
     <div class="fixed bottom-0 inset-x-0 bg-neutral-950/90 backdrop-blur-sm border-t border-white/10 px-4 py-3">
       <div class="max-w-2xl mx-auto flex gap-3">
+        <template v-if="clubsStore.canWrite">
+          <button
+            class="flex-1 h-12 rounded-xl border border-white/10 text-neutral-400 text-sm font-medium
+                   hover:border-white/20 hover:text-white transition-all"
+            @click="handleSkip"
+          >
+            Passer (sans effectif)
+          </button>
+          <button
+            :disabled="saving"
+            class="flex-1 h-12 rounded-xl bg-white text-neutral-900 text-sm font-semibold
+                   hover:bg-neutral-100 disabled:opacity-50 transition-all"
+            @click="handleSave"
+          >
+            <span v-if="saving">Enregistrement...</span>
+            <span v-else>Démarrer le match</span>
+          </button>
+        </template>
         <button
-          class="flex-1 h-12 rounded-xl border border-white/10 text-neutral-400 text-sm font-medium
-                 hover:border-white/20 hover:text-white transition-all"
+          v-else
+          class="flex-1 h-12 rounded-xl bg-white text-neutral-900 text-sm font-semibold hover:bg-neutral-100 transition-all"
           @click="handleSkip"
         >
-          Passer (sans effectif)
-        </button>
-        <button
-          :disabled="saving"
-          class="flex-1 h-12 rounded-xl bg-white text-neutral-900 text-sm font-semibold
-                 hover:bg-neutral-100 disabled:opacity-50 transition-all"
-          @click="handleSave"
-        >
-          <span v-if="saving">Enregistrement...</span>
-          <span v-else>Démarrer le match</span>
+          Voir le match
         </button>
       </div>
     </div>

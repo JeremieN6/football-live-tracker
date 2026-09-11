@@ -21,9 +21,9 @@ Construire un SaaS "Match Report AI" pour coachs amateurs : suivi live des evene
 ---
 
 ## Etat Actuel du Projet
-**Phase** : Phase 8 terminee (code), migration DB reelle a appliquer
+**Phase** : Phase 8 terminee et validee en conditions reelles
 **Derniere session** : 11/09/2026
-**Progression globale** : 100% MVP + effectif/rapport nominatif (migration non encore appliquee en prod)
+**Progression globale** : 100% MVP + effectif/rapport nominatif, teste de bout en bout par l'utilisateur
 
 ### Ce qui est fait :
 - [x] Phase 1 — Setup projet et architecture
@@ -36,7 +36,6 @@ Construire un SaaS "Match Report AI" pour coachs amateurs : suivi live des evene
 - [x] Phase 8 — Effectif de club reutilisable + selection par match (titulaires/remplacants) + evenements nominatifs (buteur, passe decisive, carton, remplacement) + rapport de match sans IA (buteurs/passeurs, cartons, chronologie)
 
 ### Prochaines etapes :
-- [ ] Appliquer la migration `supabase/migrations/20260911120000_players_and_lineups.sql` sur le projet Supabase reel (SQL Editor ou `npx supabase db push`) puis tester le flux complet (effectif → lineup → tracker → rapport)
 - [ ] Renseigner `.env.e2e.local` (E2E_SUPABASE_EMAIL + PASSWORD) et lancer `npm run e2e`
 - [ ] Ajouter monitoring erreurs (Sentry ou equivalent)
 - [ ] Durcir la securite deployment (rotation secrets, revue RLS)
@@ -67,5 +66,7 @@ Construire un SaaS "Match Report AI" pour coachs amateurs : suivi live des evene
 - Generation de rapport IA operationnelle via `generate-report` (Anthropic).
 - Harden de securite applique : retrait des variables sensibles cote client.
 - Build production valide (`npm run build` OK) et fonction Supabase redeployee.
-- 11/09/2026 : Ajout effectif de club (`players`) + selection titulaires/remplacants par match (`match_lineups`), sans placement terrain. Les evenements GOAL_FOR/YELLOW_CARD/RED_CARD/SUBSTITUTION portent desormais des references vers l'effectif (scorer_id, assist_id, player_id, player_in_id, player_out_id) a la place des anciens champs texte libre player_in/player_out. ReportView affiche un rapport nominatif sans IA (buteurs, passeurs decisifs, cartons, chronologie), independant du bloc Analyse IA. Migration SQL ecrite dans `supabase/migrations/20260911120000_players_and_lineups.sql` mais **pas encore appliquee** sur le vrai projet Supabase (pas d'acces credentials depuis la session distante) — a faire manuellement avant de tester en conditions reelles. Discussion sur une migration vers Neon : ecartee pour ce projet (voir Decisions Prises), l'utilisateur reste sur Supabase.
-- Build (`npm run build`) et typecheck (`vue-tsc -b`) valides apres ces changements. Dev server verifie localement (credentials factices, pas de test end-to-end avec vraies donnees possible depuis cette session).
+- 11/09/2026 : Ajout effectif de club (`players`) + selection titulaires/remplacants par match (`match_lineups`), sans placement terrain. Les evenements GOAL_FOR/YELLOW_CARD/RED_CARD/SUBSTITUTION portent desormais des references vers l'effectif (scorer_id, assist_id, player_id, player_in_id, player_out_id) a la place des anciens champs texte libre player_in/player_out. ReportView affiche un rapport nominatif sans IA (buteurs, passeurs decisifs, cartons, chronologie), independant du bloc Analyse IA. Discussion sur une migration vers Neon : ecartee pour ce projet (voir Decisions Prises), l'utilisateur reste sur Supabase.
+- Build (`npm run build`) et typecheck (`vue-tsc -b`) valides apres ces changements.
+- 11/09/2026 : Migration `20260911120000_players_and_lineups.sql` appliquee par l'utilisateur sur le vrai projet Supabase (SQL Editor). Parcours complet teste en conditions reelles par l'utilisateur : creation joueurs dans l'effectif, nouveau match, selection titulaires/remplacants, but avec buteur + passeur decisif, carton jaune nominatif, remplacement via liste deroulante, rapport final affichant buteurs/passeurs/cartons/chronologie — tout fonctionne.
+- Bug corrige en cours de test : `RosterView.vue`, le champ numero (`<input type="number">` + v-model) pouvait renvoyer une valeur de type `number` selon le navigateur au lieu d'une chaine, faisant planter `.trim()` a la creation d'un joueur ("number.value.trim is not a function"). Fix : cast explicite `String(number.value).trim()` avant conversion en `Number`.

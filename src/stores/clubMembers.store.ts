@@ -7,19 +7,19 @@ export interface ClubMember {
   id: string
   clubId: string
   userId: string | null
-  teamId: string | null
+  teamIds: string[]
   role: 'OWNER' | 'COACH'
   invitedEmail: string | null
   status: 'PENDING' | 'ACTIVE'
   createdAt: string
 }
 
-function rowToMember(row: Record<string, unknown>): ClubMember {
+function rowToMember(row: Record<string, unknown>, teamIds: string[]): ClubMember {
   return {
     id: row.id as string,
     clubId: row.club_id as string,
     userId: row.user_id as string | null,
-    teamId: row.team_id as string | null,
+    teamIds,
     role: row.role as ClubMember['role'],
     invitedEmail: row.invited_email as string | null,
     status: row.status as ClubMember['status'],
@@ -42,7 +42,24 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
         .eq('club_id', clubId)
         .order('created_at', { ascending: true })
       if (sbError) throw sbError
-      members.value = (data ?? []).map(rowToMember)
+
+      const rows = data ?? []
+      const memberIds = rows.map((r) => r.id as string)
+      const teamsByMember = new Map<string, string[]>()
+      if (memberIds.length > 0) {
+        const { data: links, error: linksError } = await supabase
+          .from('club_member_teams')
+          .select('member_id, team_id')
+          .in('member_id', memberIds)
+        if (linksError) throw linksError
+        for (const link of links ?? []) {
+          const list = teamsByMember.get(link.member_id as string) ?? []
+          list.push(link.team_id as string)
+          teamsByMember.set(link.member_id as string, list)
+        }
+      }
+
+      members.value = rows.map((row) => rowToMember(row, teamsByMember.get(row.id as string) ?? []))
     } catch (err: unknown) {
       error.value = extractErrorMessage(err, 'Erreur lors du chargement des membres.')
     } finally {
@@ -50,16 +67,16 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
     }
   }
 
-  // Invite un coach par email sur une équipe précise (status PENDING tant qu'il n'a pas de compte lié)
-  async function inviteMember(clubId: string, payload: { email: string; teamId: string }) {
+  // Invite un coach par email sur une ou plusieurs équipes (status PENDING tant qu'il n'a pas de compte lié)
+  async function inviteMember(clubId: string, payload: { email: string; teamIds: string[] }) {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) throw new Error('Non authentifié.')
+    if (payload.teamIds.length === 0) throw new Error('Sélectionnez au moins une équipe.')
 
     const { data, error: sbError } = await supabase
       .from('club_members')
       .insert({
         club_id: clubId,
-        team_id: payload.teamId,
         role: 'COACH',
         status: 'PENDING',
         invited_email: payload.email.trim().toLowerCase(),
@@ -68,7 +85,13 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
       .select()
       .single()
     if (sbError) throw sbError
-    members.value.push(rowToMember(data))
+
+    const { error: linksError } = await supabase
+      .from('club_member_teams')
+      .insert(payload.teamIds.map((teamId) => ({ member_id: data.id, team_id: teamId })))
+    if (linksError) throw linksError
+
+    members.value.push(rowToMember(data, payload.teamIds))
   }
 
   async function removeMember(id: string) {

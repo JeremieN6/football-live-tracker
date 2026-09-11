@@ -13,7 +13,7 @@ const membersStore = useClubMembersStore()
 
 const showForm = ref(false)
 const email = ref('')
-const teamId = ref<string | null>(null)
+const teamIds = ref<string[]>([])
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
@@ -30,9 +30,17 @@ onMounted(async () => {
   }
 })
 
-function teamName(id: string | null): string {
-  if (!id) return 'Toutes les équipes (propriétaire)'
-  return teamsStore.teams.find((t) => t.id === id)?.name ?? 'Équipe inconnue'
+function teamNames(ids: string[]): string {
+  if (ids.length === 0) return 'Aucune équipe'
+  return ids
+    .map((id) => teamsStore.teams.find((t) => t.id === id)?.name ?? 'Équipe inconnue')
+    .join(', ')
+}
+
+function toggleTeam(id: string) {
+  const index = teamIds.value.indexOf(id)
+  if (index === -1) teamIds.value.push(id)
+  else teamIds.value.splice(index, 1)
 }
 
 const sortedMembers = computed(() =>
@@ -41,17 +49,17 @@ const sortedMembers = computed(() =>
 
 function resetForm() {
   email.value = ''
-  teamId.value = null
+  teamIds.value = []
   errorMessage.value = null
   showForm.value = false
 }
 
 async function handleInvite() {
-  if (!email.value.trim() || !teamId.value || !clubsStore.club) return
+  if (!email.value.trim() || teamIds.value.length === 0 || !clubsStore.club) return
   errorMessage.value = null
   saving.value = true
   try {
-    await membersStore.inviteMember(clubsStore.club.id, { email: email.value, teamId: teamId.value })
+    await membersStore.inviteMember(clubsStore.club.id, { email: email.value, teamIds: teamIds.value })
     resetForm()
   } catch (err: unknown) {
     errorMessage.value = extractErrorMessage(err, 'Erreur lors de l\'invitation.')
@@ -120,7 +128,8 @@ async function handleRemove(id: string) {
                 {{ member.invitedEmail ?? 'Vous' }}
               </p>
               <p class="text-xs text-neutral-500">
-                {{ member.role === 'OWNER' ? 'Propriétaire' : 'Coach' }} · {{ teamName(member.teamId) }}
+                {{ member.role === 'OWNER' ? 'Propriétaire' : 'Coach' }} ·
+                {{ member.role === 'OWNER' ? 'Toutes les équipes' : teamNames(member.teamIds) }}
                 <span v-if="member.status === 'PENDING'" class="text-amber-400">· Invitation en attente</span>
               </p>
             </div>
@@ -168,16 +177,25 @@ async function handleRemove(id: string) {
             </p>
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Équipe</label>
-            <select
-              v-model="teamId"
-              required
-              class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
-                     text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
-            >
-              <option :value="null" disabled>Sélectionner...</option>
-              <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">{{ t.name }}</option>
-            </select>
+            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Équipes</label>
+            <p class="text-xs text-neutral-600 mb-1">
+              Un membre peut avoir accès à plusieurs équipes (ex. coach d'une équipe et responsable d'une autre).
+            </p>
+            <div class="space-y-1.5">
+              <label
+                v-for="t in teamsStore.teams"
+                :key="t.id"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  :checked="teamIds.includes(t.id)"
+                  class="accent-white"
+                  @change="toggleTeam(t.id)"
+                />
+                <span class="text-sm text-white">{{ t.name }}</span>
+              </label>
+            </div>
             <p v-if="teamsStore.teams.length === 0" class="text-xs text-neutral-600">
               Aucune équipe créée pour le moment —
               <button type="button" class="underline hover:text-white" @click="router.push({ name: 'teams' })">en créer une</button>
@@ -199,7 +217,7 @@ async function handleRemove(id: string) {
             </button>
             <button
               type="submit"
-              :disabled="saving || !email.trim() || !teamId"
+              :disabled="saving || !email.trim() || teamIds.length === 0"
               class="flex-1 h-11 rounded-lg bg-white text-neutral-900 text-sm font-semibold
                      hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >

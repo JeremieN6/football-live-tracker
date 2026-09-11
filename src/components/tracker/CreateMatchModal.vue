@@ -25,7 +25,7 @@ const errorMessage = ref<string | null>(null)
 // Un coach non-propriétaire ne peut créer un match que pour sa propre équipe
 const selectableTeams = computed(() => {
   if (clubsStore.isOwner) return teamsStore.teams
-  return teamsStore.teams.filter((t) => t.id === clubsStore.membership?.teamId)
+  return teamsStore.teams.filter((t) => clubsStore.membership?.teamIds.includes(t.id))
 })
 
 onMounted(async () => {

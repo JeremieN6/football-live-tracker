@@ -15,7 +15,7 @@ function rowToClub(row: Record<string, unknown>): Club {
 
 export interface Membership {
   role: 'OWNER' | 'COACH'
-  teamId: string | null
+  teamIds: string[]
 }
 
 export const useClubsStore = defineStore('clubs', () => {
@@ -49,7 +49,7 @@ export const useClubsStore = defineStore('clubs', () => {
 
       if (existing) {
         club.value = rowToClub(existing)
-        membership.value = { role: 'OWNER', teamId: null }
+        membership.value = { role: 'OWNER', teamIds: [] }
         // Auto-réparation : un club sans aucune équipe (ex. suite à une migration ou un aléa)
         // ne doit pas rester bloqué sans équipe par défaut.
         const { count: teamCount, error: countError } = await supabase
@@ -69,7 +69,7 @@ export const useClubsStore = defineStore('clubs', () => {
       // Pas propriétaire : peut-être coach invité sur le club de quelqu'un d'autre
       const { data: memberRow, error: memberFetchError } = await supabase
         .from('club_members')
-        .select('club_id, role, team_id')
+        .select('id, club_id, role')
         .eq('user_id', userData.user.id)
         .eq('status', 'ACTIVE')
         .limit(1)
@@ -83,8 +83,18 @@ export const useClubsStore = defineStore('clubs', () => {
           .eq('id', memberRow.club_id)
           .single()
         if (clubFetchError) throw clubFetchError
+
+        const { data: teamLinks, error: teamLinksError } = await supabase
+          .from('club_member_teams')
+          .select('team_id')
+          .eq('member_id', memberRow.id)
+        if (teamLinksError) throw teamLinksError
+
         club.value = rowToClub(memberClub)
-        membership.value = { role: memberRow.role as Membership['role'], teamId: memberRow.team_id as string | null }
+        membership.value = {
+          role: memberRow.role as Membership['role'],
+          teamIds: (teamLinks ?? []).map((row) => row.team_id as string),
+        }
         return club.value
       }
 
@@ -107,7 +117,7 @@ export const useClubsStore = defineStore('clubs', () => {
       if (memberError) throw memberError
 
       club.value = rowToClub(newClub)
-      membership.value = { role: 'OWNER', teamId: null }
+      membership.value = { role: 'OWNER', teamIds: [] }
       return club.value
     } catch (err: unknown) {
       error.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')

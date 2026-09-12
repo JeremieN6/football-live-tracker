@@ -22,10 +22,11 @@ const teamId = ref<string | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 
-// Un coach non-propriétaire ne peut créer un match que pour sa propre équipe
+// Un coach non-propriétaire ne peut créer un match que pour ses équipes
+// rattachées (ou celles de sa catégorie pour un Responsable de catégorie)
 const selectableTeams = computed(() => {
   if (clubsStore.isOwner) return teamsStore.teams
-  return teamsStore.teams.filter((t) => clubsStore.membership?.teamIds.includes(t.id))
+  return teamsStore.teams.filter((t) => clubsStore.hasTeamAccess(t))
 })
 
 onMounted(async () => {

@@ -14,11 +14,15 @@ export function rowToClub(row: Record<string, unknown>): Club {
   }
 }
 
-export type MemberRole = 'OWNER' | 'COACH' | 'PLAYER' | 'OTHER'
+export type MemberRole = 'OWNER' | 'COACH' | 'PLAYER' | 'OTHER' | 'PRESIDENT' | 'CATEGORY_MANAGER' | 'ADJOINT'
 
 export interface Membership {
   role: MemberRole
   teamIds: string[]
+  // Catégories rattachées (Responsable de catégorie uniquement) : accès
+  // automatique à toute équipe partageant une de ces catégories, y compris
+  // une équipe créée après coup.
+  categories: string[]
 }
 
 // Levée par ensureClub() quand l'utilisateur n'a ni club, ni invitation en
@@ -39,8 +43,30 @@ export const useClubsStore = defineStore('clubs', () => {
 
   const isOwner = computed(() => membership.value?.role === 'OWNER')
   // Droit d'écriture (créer/modifier/supprimer) sur les équipes du membre :
-  // le OWNER (admin/futur président) et le COACH l'ont, PLAYER/OTHER sont en lecture seule.
-  const canWrite = computed(() => membership.value?.role === 'OWNER' || membership.value?.role === 'COACH')
+  // OWNER, COACH, ADJOINT (aide le coach à opérer le live tracker sur son
+  // équipe) et CATEGORY_MANAGER (Responsable de catégorie, écriture sur
+  // toute équipe de sa/ses catégorie(s)) l'ont ; PLAYER/OTHER/PRESIDENT sont
+  // en lecture seule (le PRESIDENT voit tout le club mais n'écrit jamais).
+  const canWrite = computed(() =>
+    membership.value?.role === 'OWNER' ||
+    membership.value?.role === 'COACH' ||
+    membership.value?.role === 'ADJOINT' ||
+    membership.value?.role === 'CATEGORY_MANAGER',
+  )
+
+  // Un membre a-t-il accès (au sens écriture, cf. can_write_team côté RLS) à
+  // cette équipe ? Utilisé pour filtrer les sélecteurs d'équipe (nouveau
+  // match, assignation de joueur) chez un non-OWNER : rattachement direct
+  // (club_member_teams, COACH/ADJOINT/PLAYER/OTHER) OU catégorie partagée
+  // (CATEGORY_MANAGER). Le OWNER a toujours accès à tout, géré à part par
+  // isOwner dans les appelants.
+  function hasTeamAccess(team: { id: string; category?: string | null }): boolean {
+    const m = membership.value
+    if (!m) return false
+    if (m.teamIds.includes(team.id)) return true
+    if (m.role === 'CATEGORY_MANAGER' && team.category) return m.categories.includes(team.category)
+    return false
+  }
 
   // Récupère le club de l'utilisateur :
   // - s'il est propriétaire d'un club, le renvoie (et le crée avec une équipe
@@ -65,7 +91,7 @@ export const useClubsStore = defineStore('clubs', () => {
 
       if (existing) {
         club.value = rowToClub(existing)
-        membership.value = { role: 'OWNER', teamIds: [] }
+        membership.value = { role: 'OWNER', teamIds: [], categories: [] }
         // Auto-réparation : un club sans aucune équipe (ex. suite à une migration ou un aléa)
         // ne doit pas rester bloqué sans équipe par défaut.
         const { count: teamCount, error: countError } = await supabase
@@ -106,10 +132,17 @@ export const useClubsStore = defineStore('clubs', () => {
           .eq('member_id', memberRow.id)
         if (teamLinksError) throw teamLinksError
 
+        const { data: categoryLinks, error: categoryLinksError } = await supabase
+          .from('club_member_categories')
+          .select('category')
+          .eq('member_id', memberRow.id)
+        if (categoryLinksError) throw categoryLinksError
+
         club.value = rowToClub(memberClub)
         membership.value = {
           role: memberRow.role as Membership['role'],
           teamIds: (teamLinks ?? []).map((row) => row.team_id as string),
+          categories: (categoryLinks ?? []).map((row) => row.category as string),
         }
         return club.value
       }
@@ -155,7 +188,7 @@ export const useClubsStore = defineStore('clubs', () => {
       if (memberError) throw memberError
 
       club.value = rowToClub(newClub)
-      membership.value = { role: 'OWNER', teamIds: [] }
+      membership.value = { role: 'OWNER', teamIds: [], categories: [] }
       return club.value
     } catch (err: unknown) {
       error.value = extractErrorMessage(err, 'Erreur lors de la création du club.')
@@ -178,5 +211,5 @@ export const useClubsStore = defineStore('clubs', () => {
     error.value = null
   }
 
-  return { club, membership, isOwner, canWrite, loading, error, ensureClub, createClub, renameClub, reset }
+  return { club, membership, isOwner, canWrite, hasTeamAccess, loading, error, ensureClub, createClub, renameClub, reset }
 })

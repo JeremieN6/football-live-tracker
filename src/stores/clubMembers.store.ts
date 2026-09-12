@@ -9,18 +9,20 @@ export interface ClubMember {
   clubId: string
   userId: string | null
   teamIds: string[]
+  categories: string[]
   role: MemberRole
   invitedEmail: string | null
   status: 'PENDING' | 'ACTIVE'
   createdAt: string
 }
 
-function rowToMember(row: Record<string, unknown>, teamIds: string[]): ClubMember {
+function rowToMember(row: Record<string, unknown>, teamIds: string[], categories: string[]): ClubMember {
   return {
     id: row.id as string,
     clubId: row.club_id as string,
     userId: row.user_id as string | null,
     teamIds,
+    categories,
     role: row.role as ClubMember['role'],
     invitedEmail: row.invited_email as string | null,
     status: row.status as ClubMember['status'],
@@ -47,6 +49,7 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
       const rows = data ?? []
       const memberIds = rows.map((r) => r.id as string)
       const teamsByMember = new Map<string, string[]>()
+      const categoriesByMember = new Map<string, string[]>()
       if (memberIds.length > 0) {
         const { data: links, error: linksError } = await supabase
           .from('club_member_teams')
@@ -58,9 +61,22 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
           list.push(link.team_id as string)
           teamsByMember.set(link.member_id as string, list)
         }
+
+        const { data: categoryLinks, error: categoryLinksError } = await supabase
+          .from('club_member_categories')
+          .select('member_id, category')
+          .in('member_id', memberIds)
+        if (categoryLinksError) throw categoryLinksError
+        for (const link of categoryLinks ?? []) {
+          const list = categoriesByMember.get(link.member_id as string) ?? []
+          list.push(link.category as string)
+          categoriesByMember.set(link.member_id as string, list)
+        }
       }
 
-      members.value = rows.map((row) => rowToMember(row, teamsByMember.get(row.id as string) ?? []))
+      members.value = rows.map((row) =>
+        rowToMember(row, teamsByMember.get(row.id as string) ?? [], categoriesByMember.get(row.id as string) ?? []),
+      )
     } catch (err: unknown) {
       error.value = extractErrorMessage(err, 'Erreur lors du chargement des membres.')
     } finally {
@@ -68,12 +84,22 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
     }
   }
 
-  // Invite un membre par email, avec un rôle (coach/joueur/autre) sur une ou plusieurs
-  // équipes (status PENDING tant qu'il n'a pas de compte lié)
-  async function inviteMember(clubId: string, payload: { email: string; role: Exclude<MemberRole, 'OWNER'>; teamIds: string[] }) {
+  // Invite un membre par email avec un rôle, sur une ou plusieurs équipes
+  // (COACH/PLAYER/OTHER/ADJOINT) ou catégories (CATEGORY_MANAGER, accès
+  // automatique à toute équipe de cette catégorie) -- le PRESIDENT n'a
+  // besoin ni de l'un ni de l'autre (accès club-wide en lecture). Status
+  // PENDING tant que la personne invitée n'a pas de compte lié.
+  async function inviteMember(
+    clubId: string,
+    payload: { email: string; role: Exclude<MemberRole, 'OWNER'>; teamIds: string[]; categories: string[] },
+  ) {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) throw new Error('Non authentifié.')
-    if (payload.teamIds.length === 0) throw new Error('Sélectionnez au moins une équipe.')
+    if (payload.role === 'CATEGORY_MANAGER') {
+      if (payload.categories.length === 0) throw new Error('Sélectionnez au moins une catégorie.')
+    } else if (payload.role !== 'PRESIDENT' && payload.teamIds.length === 0) {
+      throw new Error('Sélectionnez au moins une équipe.')
+    }
 
     const { data, error: sbError } = await supabase
       .from('club_members')
@@ -88,12 +114,21 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
       .single()
     if (sbError) throw sbError
 
-    const { error: linksError } = await supabase
-      .from('club_member_teams')
-      .insert(payload.teamIds.map((teamId) => ({ member_id: data.id, team_id: teamId })))
-    if (linksError) throw linksError
+    if (payload.role === 'CATEGORY_MANAGER') {
+      const { error: categoriesError } = await supabase
+        .from('club_member_categories')
+        .insert(payload.categories.map((category) => ({ member_id: data.id, category })))
+      if (categoriesError) throw categoriesError
+    } else if (payload.teamIds.length > 0) {
+      const { error: linksError } = await supabase
+        .from('club_member_teams')
+        .insert(payload.teamIds.map((teamId) => ({ member_id: data.id, team_id: teamId })))
+      if (linksError) throw linksError
+    }
 
-    members.value.push(rowToMember(data, payload.teamIds))
+    members.value.push(
+      rowToMember(data, payload.role === 'CATEGORY_MANAGER' ? [] : payload.teamIds, payload.role === 'CATEGORY_MANAGER' ? payload.categories : []),
+    )
   }
 
   async function removeMember(id: string) {

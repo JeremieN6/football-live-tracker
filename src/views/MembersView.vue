@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useClubsStore, type MemberRole } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
-import { useClubMembersStore } from '@/stores/clubMembers.store'
+import { useClubMembersStore, type ClubMember } from '@/stores/clubMembers.store'
 import { extractErrorMessage } from '@/lib/errors'
 
 const router = useRouter()
@@ -15,8 +15,11 @@ type InvitableRole = Exclude<MemberRole, 'OWNER'>
 
 const roleOptions: { value: InvitableRole; label: string; hint: string }[] = [
   { value: 'COACH', label: 'Coach', hint: 'Accès complet (créer/modifier) sur ses équipes' },
+  { value: 'ADJOINT', label: 'Adjoint', hint: 'Aide le coach à opérer le live tracker sur son équipe' },
   { value: 'PLAYER', label: 'Joueur', hint: 'Lecture seule sur ses équipes' },
   { value: 'OTHER', label: 'Autre', hint: 'Staff, lecture seule sur ses équipes' },
+  { value: 'PRESIDENT', label: 'Président', hint: 'Lecture seule sur tout le club, aucune équipe à choisir' },
+  { value: 'CATEGORY_MANAGER', label: 'Responsable de catégorie', hint: 'Accès complet à toutes les équipes d\'une ou plusieurs catégories, y compris futures' },
 ]
 
 function roleLabel(role: MemberRole): string {
@@ -28,8 +31,26 @@ const showForm = ref(false)
 const email = ref('')
 const role = ref<InvitableRole>('COACH')
 const teamIds = ref<string[]>([])
+const categories = ref<string[]>([])
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
+
+const needsTeams = computed(() => role.value !== 'PRESIDENT' && role.value !== 'CATEGORY_MANAGER')
+const needsCategories = computed(() => role.value === 'CATEGORY_MANAGER')
+
+const availableCategories = computed(() => {
+  const set = new Set<string>()
+  for (const t of teamsStore.teams) {
+    if (t.category) set.add(t.category)
+  }
+  return [...set].sort()
+})
+
+function toggleCategory(category: string) {
+  const index = categories.value.indexOf(category)
+  if (index === -1) categories.value.push(category)
+  else categories.value.splice(index, 1)
+}
 
 onMounted(async () => {
   try {
@@ -51,6 +72,14 @@ function teamNames(ids: string[]): string {
     .join(', ')
 }
 
+function accessSummary(member: ClubMember): string {
+  if (member.role === 'OWNER' || member.role === 'PRESIDENT') return 'Toutes les équipes'
+  if (member.role === 'CATEGORY_MANAGER') {
+    return member.categories.length > 0 ? `Catégorie(s) : ${member.categories.join(', ')}` : 'Aucune catégorie'
+  }
+  return teamNames(member.teamIds)
+}
+
 function toggleTeam(id: string) {
   const index = teamIds.value.indexOf(id)
   if (index === -1) teamIds.value.push(id)
@@ -65,16 +94,29 @@ function resetForm() {
   email.value = ''
   role.value = 'COACH'
   teamIds.value = []
+  categories.value = []
   errorMessage.value = null
   showForm.value = false
 }
 
+const canSubmit = computed(() => {
+  if (!email.value.trim()) return false
+  if (needsCategories.value) return categories.value.length > 0
+  if (needsTeams.value) return teamIds.value.length > 0
+  return true
+})
+
 async function handleInvite() {
-  if (!email.value.trim() || teamIds.value.length === 0 || !clubsStore.club) return
+  if (!canSubmit.value || !clubsStore.club) return
   errorMessage.value = null
   saving.value = true
   try {
-    await membersStore.inviteMember(clubsStore.club.id, { email: email.value, role: role.value, teamIds: teamIds.value })
+    await membersStore.inviteMember(clubsStore.club.id, {
+      email: email.value,
+      role: role.value,
+      teamIds: teamIds.value,
+      categories: categories.value,
+    })
     resetForm()
   } catch (err: unknown) {
     errorMessage.value = extractErrorMessage(err, 'Erreur lors de l\'invitation.')
@@ -144,7 +186,7 @@ async function handleRemove(id: string) {
               </p>
               <p class="text-xs text-neutral-500">
                 {{ roleLabel(member.role) }} ·
-                {{ member.role === 'OWNER' ? 'Toutes les équipes' : teamNames(member.teamIds) }}
+                {{ accessSummary(member) }}
                 <span v-if="member.status === 'PENDING'" class="text-amber-400">· Invitation en attente</span>
               </p>
             </div>
@@ -193,12 +235,12 @@ async function handleRemove(id: string) {
           </div>
           <div class="space-y-1">
             <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Rôle</label>
-            <div class="grid grid-cols-3 gap-2">
+            <div class="grid grid-cols-2 gap-2">
               <button
                 v-for="opt in roleOptions"
                 :key="opt.value"
                 type="button"
-                class="h-11 rounded-lg border text-sm font-medium transition-all"
+                class="h-11 rounded-lg border text-sm font-medium transition-all px-2"
                 :class="role === opt.value
                   ? 'border-white/30 bg-white/10 text-white'
                   : 'border-white/10 text-neutral-400 hover:border-white/20 hover:text-white'"
@@ -211,7 +253,7 @@ async function handleRemove(id: string) {
               {{ roleOptions.find((r) => r.value === role)?.hint }}
             </p>
           </div>
-          <div class="space-y-1">
+          <div v-if="needsTeams" class="space-y-1">
             <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Équipes</label>
             <p class="text-xs text-neutral-600 mb-1">
               Un membre peut avoir accès à plusieurs équipes (ex. coach d'une équipe et responsable d'une autre).
@@ -236,6 +278,34 @@ async function handleRemove(id: string) {
               <button type="button" class="underline hover:text-white" @click="router.push({ name: 'club', query: { tab: 'teams' } })">en créer une</button>
             </p>
           </div>
+          <div v-if="needsCategories" class="space-y-1">
+            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Catégories</label>
+            <p class="text-xs text-neutral-600 mb-1">
+              Accès automatique à toute équipe (actuelle ou future) partageant une de ces catégories.
+            </p>
+            <div class="space-y-1.5">
+              <label
+                v-for="c in availableCategories"
+                :key="c"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  :checked="categories.includes(c)"
+                  class="accent-white"
+                  @change="toggleCategory(c)"
+                />
+                <span class="text-sm text-white">{{ c }}</span>
+              </label>
+            </div>
+            <p v-if="availableCategories.length === 0" class="text-xs text-neutral-600">
+              Aucune équipe n'a de catégorie renseignée pour le moment —
+              <button type="button" class="underline hover:text-white" @click="router.push({ name: 'club', query: { tab: 'teams' } })">en configurer une</button>
+            </p>
+          </div>
+          <p v-if="role === 'PRESIDENT'" class="text-xs text-neutral-600">
+            Le président a accès en lecture à tout le club, aucune équipe à sélectionner.
+          </p>
 
           <p v-if="errorMessage" class="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
             {{ errorMessage }}
@@ -252,7 +322,7 @@ async function handleRemove(id: string) {
             </button>
             <button
               type="submit"
-              :disabled="saving || !email.trim() || teamIds.length === 0"
+              :disabled="saving || !canSubmit"
               class="flex-1 h-11 rounded-lg bg-white text-neutral-900 text-sm font-semibold
                      hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >

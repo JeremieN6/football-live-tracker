@@ -36,10 +36,11 @@ onMounted(async () => {
   }
 })
 
-// Un coach non-propriétaire ne peut rattacher un joueur qu'à sa propre équipe
+// Un coach non-propriétaire ne peut rattacher un joueur qu'à ses équipes
+// rattachées (ou celles de sa catégorie pour un Responsable de catégorie)
 const selectableTeams = computed(() => {
   if (clubsStore.isOwner) return teamsStore.teams
-  return teamsStore.teams.filter((t) => clubsStore.membership?.teamIds.includes(t.id))
+  return teamsStore.teams.filter((t) => clubsStore.hasTeamAccess(t))
 })
 
 // Postes existants dans l'effectif, pour peupler le filtre

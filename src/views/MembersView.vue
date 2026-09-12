@@ -80,8 +80,18 @@ function accessSummary(member: ClubMember): string {
   return teamNames(member.teamIds)
 }
 
+// Un joueur ou un membre "Autre" n'appartient qu'à une seule équipe à la
+// fois (contrairement a COACH/ADJOINT, qui peuvent cumuler plusieurs
+// equipes) : une seule case cochable, les autres grisees tant qu'elle
+// reste cochee.
+const singleTeamRole = computed(() => role.value === 'PLAYER' || role.value === 'OTHER')
+
 function toggleTeam(id: string) {
   const index = teamIds.value.indexOf(id)
+  if (singleTeamRole.value) {
+    teamIds.value = index === -1 ? [id] : []
+    return
+  }
   if (index === -1) teamIds.value.push(id)
   else teamIds.value.splice(index, 1)
 }
@@ -244,7 +254,7 @@ async function handleRemove(id: string) {
                 :class="role === opt.value
                   ? 'border-white/30 bg-white/10 text-white'
                   : 'border-white/10 text-neutral-400 hover:border-white/20 hover:text-white'"
-                @click="role = opt.value"
+                @click="role = opt.value; if ((opt.value === 'PLAYER' || opt.value === 'OTHER') && teamIds.length > 1) teamIds = [teamIds[0]]"
               >
                 {{ opt.label }}
               </button>
@@ -256,17 +266,21 @@ async function handleRemove(id: string) {
           <div v-if="needsTeams" class="space-y-1">
             <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Équipes</label>
             <p class="text-xs text-neutral-600 mb-1">
-              Un membre peut avoir accès à plusieurs équipes (ex. coach d'une équipe et responsable d'une autre).
+              {{ singleTeamRole
+                ? 'Un joueur (ou un membre "Autre") n\'appartient qu\'à une seule équipe à la fois.'
+                : 'Un membre peut avoir accès à plusieurs équipes (ex. coach d\'une équipe et responsable d\'une autre).' }}
             </p>
             <div class="space-y-1.5">
               <label
                 v-for="t in teamsStore.teams"
                 :key="t.id"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 cursor-pointer"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 transition-opacity"
+                :class="singleTeamRole && teamIds.length > 0 && !teamIds.includes(t.id) ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'"
               >
                 <input
                   type="checkbox"
                   :checked="teamIds.includes(t.id)"
+                  :disabled="singleTeamRole && teamIds.length > 0 && !teamIds.includes(t.id)"
                   class="accent-white"
                   @change="toggleTeam(t.id)"
                 />

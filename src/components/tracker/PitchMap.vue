@@ -1,163 +1,112 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { MatchEvent, ZoneX, ZoneY } from '@/types/match.types'
+import { eventColor } from '@/lib/eventPalette'
 
 const props = defineProps<{
   events: MatchEvent[]
-  // Si une action est sélectionnée (et nécessite un clic terrain), on l'affiche en hover
+  // Si une action est sélectionnée (et nécessite un tap terrain), on l'affiche en hint
   activeAction: string | null
+  hint: string
 }>()
 
 const emit = defineEmits<{
   pitchClick: [{ pitchX: number; pitchY: number; zoneX: ZoneX; zoneY: ZoneY }]
 }>()
 
-// Les actions qui ne nécessitent pas de clic sur le terrain
+// Les actions qui ne nécessitent pas de tap sur le terrain (elles s'enregistrent
+// directement, éventuellement après un choix de joueur dans une modale à part)
 const NO_PITCH_ACTIONS = new Set(['SUBSTITUTION', 'YELLOW_CARD', 'RED_CARD'])
 
 const needsPitchClick = computed(
   () => props.activeAction !== null && !NO_PITCH_ACTIONS.has(props.activeAction),
 )
 
-// Détermine la zone X selon la position relative (0→1)
-function getZoneX(px: number): ZoneX {
-  if (px < 0.18) return 'DEFENSIVE_BOX'
-  if (px < 0.40) return 'DEFENSIVE_HALF'
-  if (px < 0.60) return 'MIDFIELD'
-  if (px < 0.82) return 'OFFENSIVE_HALF'
-  return 'OFFENSIVE_BOX'
+// Terrain en portrait (but adverse en haut, but du club en bas — convention tableau
+// tactique) : pitchY détermine la bande offensive/défensive, pitchX le couloir.
+// C'est une rotation à 90° de l'ancienne convention (terrain horizontal, pitchX =
+// bande, pitchY = couloir) — même structure de données (ZoneX/ZoneY, pitchX/pitchY
+// 0..1 inchangés), juste réinterprétée pour matcher la nouvelle orientation.
+function getZoneX(pitchY: number): ZoneX {
+  if (pitchY < 0.18) return 'OFFENSIVE_BOX'
+  if (pitchY < 0.40) return 'OFFENSIVE_HALF'
+  if (pitchY < 0.60) return 'MIDFIELD'
+  if (pitchY < 0.82) return 'DEFENSIVE_HALF'
+  return 'DEFENSIVE_BOX'
 }
-
-// Détermine la zone Y selon la position relative (0→1)
-function getZoneY(py: number): ZoneY {
-  if (py < 0.33) return 'LEFT_FLANK'
-  if (py < 0.66) return 'CENTER'
+function getZoneY(pitchX: number): ZoneY {
+  if (pitchX < 0.33) return 'LEFT_FLANK'
+  if (pitchX < 0.66) return 'CENTER'
   return 'RIGHT_FLANK'
 }
 
 function handleClick(e: MouseEvent) {
   if (!needsPitchClick.value) return
 
-  const svg = (e.currentTarget as SVGSVGElement)
-  const rect = svg.getBoundingClientRect()
+  const el = e.currentTarget as HTMLElement
+  const rect = el.getBoundingClientRect()
   const pitchX = (e.clientX - rect.left) / rect.width
   const pitchY = (e.clientY - rect.top) / rect.height
 
   emit('pitchClick', {
     pitchX: Math.round(pitchX * 1000) / 1000,
     pitchY: Math.round(pitchY * 1000) / 1000,
-    zoneX: getZoneX(pitchX),
-    zoneY: getZoneY(pitchY),
+    zoneX: getZoneX(pitchY),
+    zoneY: getZoneY(pitchX),
   })
 }
 
-// Couleur du marqueur selon le type d'événement
-const markerColors: Record<string, string> = {
-  GOAL_FOR: '#22c55e',
-  GOAL_AGAINST: '#ef4444',
-  SHOT_ON_TARGET: '#3b82f6',
-  SHOT_OFF_TARGET: '#6366f1',
-  CHANCE_CLEAR: '#f59e0b',
-  CORNER_FOR: '#06b6d4',
-  CORNER_AGAINST: '#f97316',
-  FREE_KICK_FOR: '#8b5cf6',
-  FREE_KICK_AGAINST: '#ec4899',
-  DANGER_SUFFERED: '#ef4444',
-  YELLOW_CARD: '#eab308',
-  RED_CARD: '#ef4444',
-}
-
-function markerColor(type: string): string {
-  return markerColors[type] ?? '#94a3b8'
-}
-
-// Filtre les événements avec position sur le terrain
-const pitchEvents = computed(() =>
-  props.events.filter((e) => e.pitchX !== null && e.pitchY !== null),
-)
+const pitchEvents = computed(() => props.events.filter((e) => e.pitchX !== null && e.pitchY !== null))
 </script>
 
 <template>
-  <div class="w-full px-4">
-    <div class="relative w-full" style="aspect-ratio: 440/290;">
-      <svg
-        viewBox="0 0 440 290"
-        class="w-full h-full rounded-xl"
-        :class="needsPitchClick ? 'cursor-crosshair' : 'cursor-default'"
-        @click="handleClick"
-      >
-        <!-- Pelouse -->
-        <rect x="0" y="0" width="440" height="290" rx="10" fill="#166534" />
+  <div
+    class="relative h-[300px] bg-pitch overflow-hidden"
+    :class="needsPitchClick ? 'cursor-crosshair' : 'cursor-default'"
+    @click="handleClick"
+  >
+    <!-- Bandes de tonte -->
+    <div
+      class="absolute inset-0"
+      style="background: repeating-linear-gradient(to bottom, rgba(255,255,255,.022) 0 33px, transparent 33px 66px)"
+    />
 
-        <!-- Bandes de gazon alternées -->
-        <rect x="0" y="0" width="55" height="290" fill="#15803d" opacity="0.4" />
-        <rect x="110" y="0" width="55" height="290" fill="#15803d" opacity="0.4" />
-        <rect x="220" y="0" width="55" height="290" fill="#15803d" opacity="0.4" />
-        <rect x="330" y="0" width="55" height="290" fill="#15803d" opacity="0.4" />
+    <!-- Lignes du terrain -->
+    <svg viewBox="0 0 68 105" preserveAspectRatio="none" class="absolute inset-0 w-full h-full pointer-events-none" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="0.4">
+      <rect x="2" y="2" width="64" height="101" />
+      <line x1="2" y1="52.5" x2="66" y2="52.5" />
+      <circle cx="34" cy="52.5" r="9" />
+      <circle cx="34" cy="52.5" r="0.7" fill="rgba(255,255,255,.5)" stroke="none" />
+      <rect x="14" y="2" width="40" height="16" />
+      <rect x="25" y="2" width="18" height="6" />
+      <rect x="14" y="87" width="40" height="16" />
+      <rect x="25" y="97" width="18" height="6" />
+      <circle cx="34" cy="13" r="0.7" fill="rgba(255,255,255,.5)" stroke="none" />
+      <circle cx="34" cy="92" r="0.7" fill="rgba(255,255,255,.5)" stroke="none" />
+    </svg>
 
-        <!-- Lignes du terrain -->
-        <!-- Bordure -->
-        <rect x="8" y="8" width="424" height="274" rx="4" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
+    <!-- Marqueurs des événements -->
+    <div
+      v-for="event in pitchEvents"
+      :key="event.id"
+      class="absolute flex flex-col items-center gap-0.5 -translate-x-1/2 -translate-y-1/2"
+      :style="{ left: `${(event.pitchX ?? 0) * 100}%`, top: `${(event.pitchY ?? 0) * 100}%` }"
+    >
+      <span
+        class="w-[11px] h-[11px] rounded-full border-[1.5px]"
+        :style="{ background: eventColor(event.type), borderColor: 'rgba(15,25,35,.7)' }"
+      />
+      <span class="font-score text-[9px] font-bold text-ink" style="text-shadow: 0 1px 2px rgba(0,0,0,.8)">{{ event.minute }}'</span>
+    </div>
 
-        <!-- Ligne médiane -->
-        <line x1="220" y1="8" x2="220" y2="282" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
-
-        <!-- Cercle central -->
-        <circle cx="220" cy="145" r="46" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
-        <circle cx="220" cy="145" r="3" fill="rgba(255,255,255,0.6)" />
-
-        <!-- Surface de réparation gauche (défensive) -->
-        <rect x="8" y="76" width="66" height="138" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
-        <!-- Surface de but gauche -->
-        <rect x="8" y="112" width="24" height="66" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
-        <!-- Point de penalty gauche -->
-        <circle cx="52" cy="145" r="2.5" fill="rgba(255,255,255,0.6)" />
-
-        <!-- Surface de réparation droite (offensive) -->
-        <rect x="366" y="76" width="66" height="138" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
-        <!-- Surface de but droite -->
-        <rect x="408" y="112" width="24" height="66" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
-        <!-- Point de penalty droit -->
-        <circle cx="388" cy="145" r="2.5" fill="rgba(255,255,255,0.6)" />
-
-        <!-- Cages -->
-        <rect x="2" y="119" width="6" height="52" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2" />
-        <rect x="432" y="119" width="6" height="52" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2" />
-
-        <!-- Overlay hover si action sélectionnée -->
-        <rect
-          v-if="needsPitchClick"
-          x="0" y="0" width="440" height="290"
-          rx="10"
-          fill="rgba(255,255,255,0.04)"
-        />
-
-        <!-- Marqueurs des événements -->
-        <g v-for="event in pitchEvents" :key="event.id">
-          <circle
-            :cx="(event.pitchX ?? 0) * 440"
-            :cy="(event.pitchY ?? 0) * 290"
-            r="7"
-            :fill="markerColor(event.type)"
-            opacity="0.85"
-          />
-          <text
-            :x="(event.pitchX ?? 0) * 440"
-            :y="(event.pitchY ?? 0) * 290 - 10"
-            text-anchor="middle"
-            font-size="9"
-            font-weight="600"
-            fill="white"
-            opacity="0.9"
-          >{{ event.minute }}'</text>
-        </g>
-      </svg>
-
-      <!-- Label directionnel -->
-      <div class="flex justify-between px-1 mt-1">
-        <span class="text-xs text-neutral-600">◀ Défense</span>
-        <span class="text-xs text-neutral-600">Attaque ▶</span>
-      </div>
+    <!-- Barre d'indication — en HAUT (pas en bas comme sur le HTML brut de la
+         maquette) et pointer-events:none : place en bas, elle interceptait les taps
+         sur le gardien (bug documente explicitement dans le handoff design). -->
+    <div
+      class="absolute left-3 right-3 top-2.5 text-center px-2.5 py-[7px] rounded-input font-medium text-xs transition-opacity pointer-events-none"
+      :style="{ background: 'rgba(15,25,35,.88)', border: '1px solid #374151', color: '#F9FAFB', opacity: hint ? 1 : 0 }"
+    >
+      {{ hint }}
     </div>
   </div>
 </template>

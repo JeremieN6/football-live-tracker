@@ -9,6 +9,7 @@ const props = defineProps<{
   scoreAway: number
   homeTeam: string
   awayTeam: string
+  meta: string
   canControl?: boolean
 }>()
 
@@ -21,74 +22,56 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <!-- Barre fixe en haut — toujours visible, jamais scrollable -->
-  <div class="sticky top-0 z-40 bg-neutral-900/95 backdrop-blur-sm border-b border-white/10">
-    <div class="px-4 py-3">
+  <div class="flex-none bg-app border-b border-line px-4 pt-2.5 pb-3">
 
-      <!-- Score -->
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-sm font-semibold text-white truncate flex-1 text-left">{{ props.homeTeam }}</span>
-        <div class="flex items-center gap-3 mx-3 shrink-0">
-          <span class="text-2xl font-bold tabular-nums text-white">{{ props.scoreHome }}</span>
-          <span class="text-neutral-600 font-light">–</span>
-          <span class="text-2xl font-bold tabular-nums text-white">{{ props.scoreAway }}</span>
-        </div>
-        <span class="text-sm font-semibold text-white truncate flex-1 text-right">{{ props.awayTeam }}</span>
-      </div>
-
-      <!-- Chrono + contrôles -->
-      <div class="flex items-center justify-between">
-
-        <!-- Indicateur mi-temps -->
-        <div class="flex items-center gap-1.5">
-          <div
-            class="w-2 h-2 rounded-full"
-            :class="props.running ? 'bg-green-400 animate-pulse' : 'bg-neutral-600'"
-          />
-          <span class="text-xs text-neutral-400">{{ props.half === 1 ? '1ère mi-temps' : '2ème mi-temps' }}</span>
-        </div>
-
-        <!-- Affichage chrono -->
-        <span class="text-3xl font-mono font-bold text-white tabular-nums tracking-tight">
-          {{ props.display }}
-        </span>
-
-        <!-- Boutons de contrôle -->
-        <div v-if="props.canControl !== false" class="flex items-center gap-1.5">
-          <!-- Start / Pause -->
-          <button
-            v-if="!props.running"
-            class="h-9 px-3 rounded-lg bg-green-500/20 text-green-400 text-xs font-semibold hover:bg-green-500/30 transition-all"
-            @click="emit('start')"
-          >
-            ▶
-          </button>
-          <button
-            v-else
-            class="h-9 px-3 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-semibold hover:bg-yellow-500/30 transition-all"
-            @click="emit('pause')"
-          >
-            ⏸
-          </button>
-
-          <!-- Mi-temps (uniquement en 1ère mi-temps) -->
-          <button
-            v-if="props.half === 1"
-            class="h-9 px-3 rounded-lg bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-all"
-            @click="emit('switchHalf')"
-          >
-            MT
-          </button>
-
-          <!-- Reset -->
-          <button
-            class="h-9 px-3 rounded-lg bg-white/5 text-neutral-500 text-xs font-semibold hover:bg-white/10 hover:text-neutral-300 transition-all"
-            @click="emit('reset')"
-          >
-            ↺
-          </button>
-        </div>
-      </div>
+    <!-- Équipes + compétition -->
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[11px] font-medium tracking-[.5px] text-ink-secondary whitespace-nowrap overflow-hidden text-ellipsis">{{ props.homeTeam }}</span>
+      <span class="text-[11px] font-medium text-ink-meta whitespace-nowrap shrink-0">{{ props.meta }}</span>
+      <span class="text-[11px] font-medium tracking-[.5px] text-ink-secondary whitespace-nowrap overflow-hidden text-ellipsis text-right">{{ props.awayTeam }}</span>
     </div>
+
+    <!-- Score -->
+    <div class="flex items-center justify-center gap-3.5 mt-1.5">
+      <span class="font-score text-[28px] font-bold text-ink tracking-[4px]">{{ props.scoreHome }} - {{ props.scoreAway }}</span>
+    </div>
+
+    <!-- Chrono -->
+    <div class="flex items-baseline justify-center gap-2.5 mt-0.5">
+      <span class="font-score text-[36px] font-bold leading-[1.1] text-ink">{{ props.display }}</span>
+      <span class="text-[11px] font-medium tracking-[.5px] text-brand-ink">{{ props.half === 1 ? '1re mi-temps' : '2e mi-temps' }}</span>
+    </div>
+
+    <!-- Contrôles -->
+    <div v-if="props.canControl !== false" class="grid grid-cols-3 gap-2 mt-2.5">
+      <button
+        class="h-9 rounded-input text-xs font-medium border transition-colors"
+        :class="props.running
+          ? 'bg-surface border-line-strong text-ink hover:bg-surface-hover'
+          : 'bg-brand-soft border-brand-line text-brand-ink hover:bg-[#0a3d1c]'"
+        @click="props.running ? emit('pause') : emit('start')"
+      >
+        {{ props.running ? 'Pause' : 'Démarrer' }}
+      </button>
+      <button
+        class="h-9 rounded-input border border-line bg-surface text-ink-secondary text-xs font-medium
+               disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-hover hover:border-line-strong transition-colors"
+        :disabled="props.half === 2"
+        @click="emit('switchHalf')"
+      >
+        Mi-temps
+      </button>
+      <button
+        class="h-9 rounded-input border border-line bg-surface text-ink-secondary text-xs font-medium hover:bg-surface-hover hover:border-line-strong transition-colors"
+        @click="emit('reset')"
+      >
+        Reset
+      </button>
+    </div>
+
+    <!-- Lecture seule -->
+    <p v-else class="mt-2.5 text-xs text-ink-meta bg-surface border border-line rounded-input px-3 py-2 text-center">
+      Lecture seule — tu n'as pas les droits pour saisir des événements sur ce match.
+    </p>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { MatchEvent, Player } from '@/types/match.types'
+import { eventColor, eventLabel } from '@/lib/eventPalette'
 
 const props = defineProps<{
   events: MatchEvent[]
@@ -8,17 +9,15 @@ const props = defineProps<{
   readOnly?: boolean
 }>()
 
-function playerName(id: string | null): string | null {
-  if (!id) return null
-  const player = props.players?.find((p) => p.id === id)
-  return player ? player.name : null
-}
-
 const emit = defineEmits<{
   delete: [id: string]
 }>()
 
-// ID de l'événement sélectionné pour afficher la barre de suppression
+function playerName(id: string | null): string | null {
+  if (!id) return null
+  return props.players?.find((p) => p.id === id)?.name ?? null
+}
+
 const selectedId = ref<string | null>(null)
 
 function toggleSelect(id: string) {
@@ -31,84 +30,45 @@ function handleDelete(id: string) {
   selectedId.value = null
 }
 
-// Labels lisibles par type d'événement
-const eventLabels: Record<string, string> = {
-  GOAL_FOR: '⚽ But',
-  GOAL_AGAINST: '⚽ But encaissé',
-  SHOT_ON_TARGET: 'Tir cadré',
-  SHOT_OFF_TARGET: 'Tir raté',
-  CHANCE_CLEAR: 'Occasion nette',
-  CORNER_FOR: 'Corner',
-  CORNER_AGAINST: 'Corner concédé',
-  FREE_KICK_FOR: 'Coup franc',
-  FREE_KICK_AGAINST: 'Coup franc concédé',
-  DANGER_SUFFERED: 'Danger subi',
-  YELLOW_CARD: '🟨 Carton jaune',
-  RED_CARD: '🟥 Carton rouge',
-  SUBSTITUTION: '🔄 Remplacement',
-}
-
-// Couleur du point selon le type
-const dotColors: Record<string, string> = {
-  GOAL_FOR: 'bg-green-400',
-  GOAL_AGAINST: 'bg-red-400',
-  SHOT_ON_TARGET: 'bg-blue-400',
-  SHOT_OFF_TARGET: 'bg-indigo-400',
-  CHANCE_CLEAR: 'bg-amber-400',
-  CORNER_FOR: 'bg-cyan-400',
-  CORNER_AGAINST: 'bg-orange-400',
-  FREE_KICK_FOR: 'bg-violet-400',
-  FREE_KICK_AGAINST: 'bg-pink-400',
-  DANGER_SUFFERED: 'bg-red-500',
-  YELLOW_CARD: 'bg-yellow-400',
-  RED_CARD: 'bg-red-500',
-  SUBSTITUTION: 'bg-neutral-400',
-}
-
-function dotColor(type: string): string {
-  return dotColors[type] ?? 'bg-neutral-500'
-}
-
 function label(event: MatchEvent): string {
   if (event.type === 'SUBSTITUTION') {
     const playerIn = playerName(event.playerInId)
     const playerOut = playerName(event.playerOutId)
-    if (playerIn && playerOut) return `🔄 ${playerIn} ↔ ${playerOut}`
-    return eventLabels[event.type]
+    if (playerIn && playerOut) return `${playerIn} ↔ ${playerOut}`
+    return eventLabel(event.type)
   }
   if (event.type === 'GOAL_FOR') {
     const scorer = playerName(event.scorerId)
     const assist = playerName(event.assistId)
-    if (scorer && assist) return `⚽ But — ${scorer} (passe : ${assist})`
-    if (scorer) return `⚽ But — ${scorer}`
-    return eventLabels[event.type]
+    if (scorer && assist) return `But — ${scorer} (passe : ${assist})`
+    if (scorer) return `But — ${scorer}`
+    return eventLabel(event.type)
   }
   if (event.type === 'YELLOW_CARD' || event.type === 'RED_CARD') {
     const player = playerName(event.playerId)
-    if (player) return `${eventLabels[event.type]} — ${player}`
-    return eventLabels[event.type]
+    if (player) return `${eventLabel(event.type)} — ${player}`
+    return eventLabel(event.type)
   }
-  return eventLabels[event.type] ?? event.type
+  return eventLabel(event.type)
 }
 
 function zoneLabel(event: MatchEvent): string {
   if (!event.zoneX) return ''
   const zx: Record<string, string> = {
-    DEFENSIVE_BOX: 'Srt. déf.',
-    DEFENSIVE_HALF: 'Camp déf.',
-    MIDFIELD: 'Milieu',
-    OFFENSIVE_HALF: 'Camp off.',
-    OFFENSIVE_BOX: 'Srt. off.',
+    DEFENSIVE_BOX: 'surface déf.',
+    DEFENSIVE_HALF: 'défense',
+    MIDFIELD: 'milieu',
+    OFFENSIVE_HALF: 'attaque',
+    OFFENSIVE_BOX: 'surface off.',
   }
   const zy: Record<string, string> = {
-    LEFT_FLANK: 'gauche',
-    CENTER: 'centre',
-    RIGHT_FLANK: 'droite',
+    LEFT_FLANK: 'aile gauche',
+    CENTER: 'axe',
+    RIGHT_FLANK: 'aile droite',
   }
   return [zx[event.zoneX], event.zoneY ? zy[event.zoneY] : ''].filter(Boolean).join(' · ')
 }
 
-// Tri inverse : dernier événement en haut
 const sortedEvents = computed(() =>
   [...props.events].sort((a, b) => {
     if (b.minute !== a.minute) return b.minute - a.minute
@@ -118,52 +78,30 @@ const sortedEvents = computed(() =>
 </script>
 
 <template>
-  <div class="px-4">
-    <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">
-      Événements ({{ props.events.length }})
-    </h3>
-
-    <!-- Liste vide -->
-    <p v-if="sortedEvents.length === 0" class="text-sm text-neutral-600 text-center py-6">
-      Aucun événement enregistré
+  <div>
+    <p v-if="sortedEvents.length === 0" class="bg-surface border border-line rounded-card px-4 py-[18px] text-center text-[13px] text-ink-meta leading-relaxed">
+      Aucun événement — place le premier sur le terrain
     </p>
 
-    <!-- Liste des événements -->
-    <div v-else class="space-y-1">
-      <div
-        v-for="event in sortedEvents"
-        :key="event.id"
-        class="rounded-xl overflow-hidden"
-      >
-        <!-- Ligne principale -->
+    <div v-else class="flex flex-col gap-1">
+      <div v-for="event in sortedEvents" :key="event.id" class="bg-surface border border-line rounded-card overflow-hidden">
         <button
-          class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all rounded-xl"
-          :class="selectedId === event.id ? 'bg-white/10' : 'hover:bg-white/5'"
+          class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-surface-hover transition-colors"
           @click="toggleSelect(event.id)"
         >
-          <!-- Point coloré -->
-          <div class="w-2.5 h-2.5 rounded-full shrink-0" :class="dotColor(event.type)" />
-
-          <!-- Contenu -->
-          <div class="flex-1 min-w-0">
-            <span class="text-sm text-white font-medium">{{ label(event) }}</span>
-            <span v-if="zoneLabel(event)" class="text-xs text-neutral-500 ml-2">{{ zoneLabel(event) }}</span>
-          </div>
-
-          <!-- Minute -->
-          <span class="text-xs font-semibold text-neutral-400 tabular-nums shrink-0">{{ event.minute }}'</span>
+          <span class="w-[9px] h-[9px] rounded-full flex-none" :style="{ background: eventColor(event.type) }" />
+          <span class="font-score text-[13px] font-bold text-ink min-w-[30px]">{{ event.minute }}'</span>
+          <span class="flex-1 text-sm text-ink-body truncate">{{ label(event) }}</span>
+          <span class="text-[11px] text-ink-meta text-right shrink-0">{{ zoneLabel(event) }}</span>
         </button>
 
-        <!-- Barre de suppression (slide down) -->
-        <div v-if="selectedId === event.id" class="px-3 pb-2">
-          <button
-            class="w-full h-9 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-medium
-                   hover:bg-red-500/25 transition-all"
-            @click="handleDelete(event.id)"
-          >
-            Supprimer cet événement
-          </button>
-        </div>
+        <button
+          v-if="selectedId === event.id && !readOnly"
+          class="w-full h-11 border-0 border-t border-danger-line bg-danger-soft text-danger text-[13px] font-medium text-center"
+          @click="handleDelete(event.id)"
+        >
+          Supprimer l'événement
+        </button>
       </div>
     </div>
   </div>

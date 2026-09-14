@@ -6,11 +6,13 @@ import { useMatchStore } from '@/stores/match.store'
 import { useEventsStore } from '@/stores/events.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { useClubsStore } from '@/stores/clubs.store'
+import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useLineupStore } from '@/stores/lineup.store'
 import { useTimer } from '@/composables/useTimer'
 import { useOfflineQueue } from '@/composables/useOfflineQueue'
 import { useMatchSync } from '@/composables/useMatchSync'
+import { eventLabel } from '@/lib/eventPalette'
 import MatchTimer from '@/components/tracker/MatchTimer.vue'
 import PitchMap from '@/components/tracker/PitchMap.vue'
 import ActionButtons from '@/components/tracker/ActionButtons.vue'
@@ -26,6 +28,7 @@ const matchStore = useMatchStore()
 const eventsStore = useEventsStore()
 const authStore = useAuthStore()
 const clubsStore = useClubsStore()
+const teamsStore = useTeamsStore()
 const playersStore = usePlayersStore()
 const lineupStore = useLineupStore()
 const timer = useTimer()
@@ -34,7 +37,7 @@ const { pendingCount, addEventWithFallback } = useOfflineQueue()
 const matchId = route.params.id as string
 const { subscribe } = useMatchSync(matchId)
 
-// Action sélectionnée en attente d'un clic terrain
+// Action sélectionnée en attente d'un tap terrain
 const selectedAction = ref<EventType | null>(null)
 const showSubstitutionModal = ref(false)
 const showFinishConfirm = ref(false)
@@ -65,6 +68,13 @@ const lineupPlayers = computed(() => {
     })
 })
 
+const teamMeta = computed(() => {
+  const match = matchStore.currentMatch
+  if (!match) return ''
+  const name = teamsStore.teams.find((t) => t.id === match.teamId)?.name
+  return [name, match.competition].filter(Boolean).join(' · ')
+})
+
 onMounted(async () => {
   eventsStore.reset()
   await Promise.all([
@@ -73,6 +83,7 @@ onMounted(async () => {
     playersStore.fetchPlayers(),
     lineupStore.fetchLineup(matchId),
   ])
+  if (clubsStore.club) await teamsStore.fetchTeams(clubsStore.club.id)
   // Passe le match en LIVE si PENDING (uniquement si on a le droit d'écrire sur ce match)
   if (clubsStore.canWrite && matchStore.currentMatch?.status === 'PENDING') {
     await matchStore.updateMatchStatus(matchId, 'LIVE')
@@ -93,10 +104,10 @@ const scoreAway = computed(
   () => eventsStore.events.filter((e) => e.type === 'GOAL_AGAINST').length,
 )
 
-// Actions qui s'enregistrent sans clic terrain
+// Actions qui s'enregistrent sans tap terrain
 const INSTANT_ACTIONS = new Set<EventType>(['YELLOW_CARD', 'RED_CARD'])
 
-// Clic sur une action — si instantanée, on enregistre directement (ou on demande le joueur si l'effectif est connu)
+// Tap sur une action — si instantanée, on enregistre directement (ou on demande le joueur si l'effectif est connu)
 function handleActionSelect(action: EventType) {
   if (INSTANT_ACTIONS.has(action)) {
     if (lineupPlayers.value.length === 0) {
@@ -113,7 +124,11 @@ function handleActionDeselect() {
   selectedAction.value = null
 }
 
-// Clic sur le terrain — enregistre l'événement avec position
+const pitchHint = computed(() =>
+  selectedAction.value ? `Tape le terrain — ${eventLabel(selectedAction.value).toLowerCase()}` : '',
+)
+
+// Tap sur le terrain — enregistre l'événement avec position
 function handlePitchClick(pos: { pitchX: number; pitchY: number; zoneX: ZoneX; zoneY: ZoneY }) {
   if (!selectedAction.value) return
   if (selectedAction.value === 'GOAL_FOR' && lineupPlayers.value.length > 0) {
@@ -213,55 +228,40 @@ async function handleFinishMatch() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-950 text-white pb-24">
-
-    <!-- Chrono fixe en haut -->
-    <MatchTimer
-      :display="timer.display.value"
-      :running="timer.running.value"
-      :half="timer.half.value"
-      :score-home="scoreHome"
-      :score-away="scoreAway"
-      :home-team="matchStore.currentMatch?.homeTeam ?? ''"
-      :away-team="matchStore.currentMatch?.awayTeam ?? ''"
-      :can-control="clubsStore.canWrite"
-      @start="timer.start()"
-      @pause="timer.pause()"
-      @switch-half="handleSwitchHalf"
-      @reset="timer.reset()"
-    />
+  <div class="h-screen flex flex-col bg-app text-ink overflow-hidden">
 
     <!-- Chargement -->
-    <div v-if="matchStore.loading" class="flex items-center justify-center py-20">
-      <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+    <div v-if="matchStore.loading" class="flex-1 flex items-center justify-center">
+      <div class="w-6 h-6 rounded-full border-2 border-line-strong border-t-ink animate-spin" />
     </div>
 
     <template v-else>
-      <!-- Terrain SVG -->
-      <div class="py-4">
-        <PitchMap
-          :events="eventsStore.events"
-          :active-action="selectedAction"
-          @pitch-click="handlePitchClick"
-        />
-      </div>
+      <!-- Zone 1 — score + chrono + contrôles (fixe) -->
+      <MatchTimer
+        :display="timer.display.value"
+        :running="timer.running.value"
+        :half="timer.half.value"
+        :score-home="scoreHome"
+        :score-away="scoreAway"
+        :home-team="matchStore.currentMatch?.homeTeam ?? ''"
+        :away-team="matchStore.currentMatch?.awayTeam ?? ''"
+        :meta="teamMeta"
+        :can-control="clubsStore.canWrite"
+        @start="timer.start()"
+        @pause="timer.pause()"
+        @switch-half="handleSwitchHalf"
+        @reset="timer.reset()"
+      />
 
-      <!-- Instruction contextuelle -->
-      <div v-if="clubsStore.canWrite" class="px-4 mb-3 h-8 flex items-center">
-        <p v-if="selectedAction" class="text-sm text-amber-400 font-medium animate-pulse">
-          Touchez le terrain pour placer l'action
-        </p>
-        <p v-else class="text-xs text-neutral-600">
-          Sélectionnez une action ci-dessous
-        </p>
-      </div>
-      <div v-else class="px-4 mb-3">
-        <p class="text-xs text-neutral-600 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
-          Lecture seule — vous n'avez pas les droits pour saisir des événements sur ce match.
-        </p>
-      </div>
+      <!-- Zone 2 — terrain (fixe, 300px) -->
+      <PitchMap
+        :events="eventsStore.events"
+        :active-action="clubsStore.canWrite ? selectedAction : null"
+        :hint="clubsStore.canWrite ? pitchHint : ''"
+        @pitch-click="handlePitchClick"
+      />
 
-      <!-- Boutons d'action -->
+      <!-- Zone 3 — palette d'événements (fixe) -->
       <ActionButtons
         v-if="clubsStore.canWrite"
         :selected-action="selectedAction"
@@ -271,28 +271,31 @@ async function handleFinishMatch() {
       />
 
       <!-- Alerte offline -->
-      <div v-if="pendingCount > 0" class="mx-4 mt-4 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-        <p class="text-xs text-yellow-400">
+      <div v-if="pendingCount > 0" class="flex-none mx-3 mt-2 px-3 py-2 rounded-input bg-[#451a03] border border-warning/40">
+        <p class="text-xs text-warning">
           {{ pendingCount }} événement{{ pendingCount > 1 ? 's' : '' }} en attente de synchronisation
         </p>
       </div>
 
-      <!-- Séparateur -->
-      <div class="mx-4 my-5 border-t border-white/10" />
+      <!-- Zone 4 — timeline (seule zone qui scrolle) -->
+      <div class="flex-1 min-h-0 overflow-y-auto px-3 pt-2.5 pb-3.5">
+        <div class="flex items-baseline justify-between mx-1 mb-2">
+          <span class="text-[13px] font-semibold text-ink">Timeline</span>
+          <span class="font-data text-[11px] text-ink-meta">{{ eventsStore.events.length }} évén.</span>
+        </div>
 
-      <!-- Log des événements -->
-      <EventLog
-        :events="eventsStore.events"
-        :players="lineupPlayers"
-        :read-only="!clubsStore.canWrite"
-        @delete="handleDeleteEvent"
-      />
+        <EventLog
+          :events="eventsStore.events"
+          :players="lineupPlayers"
+          :read-only="!clubsStore.canWrite"
+          @delete="handleDeleteEvent"
+        />
 
-      <!-- Bouton terminer le match -->
-      <div v-if="clubsStore.canWrite" class="px-4 mt-6">
+        <!-- Bouton terminer le match -->
         <button
-          class="w-full h-12 rounded-xl border border-white/10 text-neutral-400 text-sm font-medium
-                 hover:border-red-500/30 hover:text-red-400 hover:bg-red-500/10 transition-all"
+          v-if="clubsStore.canWrite"
+          class="w-full h-12 mt-4 rounded-btn border border-line text-ink-secondary text-sm font-medium
+                 hover:border-danger-line hover:text-danger hover:bg-danger-soft transition-colors"
           @click="showFinishConfirm = true"
         >
           Terminer le match
@@ -334,25 +337,25 @@ async function handleFinishMatch() {
       class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
       @click.self="showFinishConfirm = false"
     >
-      <div class="w-full max-w-sm bg-neutral-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
-        <h2 class="text-base font-semibold text-white mb-1">Terminer le match ?</h2>
-        <p class="text-sm text-neutral-400 mb-5">
-          Le match passera en statut "Terminé" et vous pourrez générer l'analyse IA.
+      <div class="w-full max-w-sm bg-surface border border-line rounded-card p-6">
+        <h2 class="text-base font-semibold text-ink mb-1">Terminer le match ?</h2>
+        <p class="text-sm text-ink-secondary mb-5">
+          Le match passera en statut « Terminé » et tu pourras analyser les événements saisis.
         </p>
         <div class="flex gap-3">
           <button
-            class="flex-1 h-11 rounded-lg border border-white/10 text-neutral-400 text-sm font-medium hover:text-white transition-all"
+            class="flex-1 h-11 rounded-btn border border-line text-ink-secondary text-sm font-medium hover:text-ink transition-colors"
             @click="showFinishConfirm = false"
           >
             Annuler
           </button>
           <button
             :disabled="finishing"
-            class="flex-1 h-11 rounded-lg bg-white text-neutral-900 text-sm font-semibold
-                   hover:bg-neutral-100 disabled:opacity-50 transition-all"
+            class="flex-1 h-11 rounded-btn bg-brand text-brand-soft text-sm font-semibold
+                   hover:bg-brand-hover disabled:opacity-50 transition-colors"
             @click="handleFinishMatch"
           >
-            <span v-if="finishing">Finalisation...</span>
+            <span v-if="finishing">Finalisation…</span>
             <span v-else>Terminer</span>
           </button>
         </div>

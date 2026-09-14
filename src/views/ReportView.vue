@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Bot, ChevronDown } from 'lucide-vue-next'
 import { useMatchStore } from '@/stores/match.store'
 import { useEventsStore } from '@/stores/events.store'
 import { useReportStore } from '@/stores/report.store'
@@ -19,8 +20,13 @@ const lineupStore = useLineupStore()
 
 const matchId = route.params.id as string
 
-// Stats calculées côté client (affichées indépendamment du rapport IA)
 const stats = ref<ReportStats | null>(null)
+const scrollEl = ref<HTMLElement | null>(null)
+const scrolled = ref(false)
+
+function handleScroll() {
+  scrolled.value = (scrollEl.value?.scrollTop ?? 0) > 24
+}
 
 onMounted(async () => {
   eventsStore.reset()
@@ -33,9 +39,15 @@ onMounted(async () => {
     lineupStore.fetchLineup(matchId),
   ])
   stats.value = computeStats(eventsStore.events)
+  // Le listener scroll doit être posé sur le nœud scrollable lui-même
+  await nextTick()
+  scrollEl.value?.addEventListener('scroll', handleScroll, { passive: true })
 })
 
-// Effectif de ce match, résolu en objets Player
+onBeforeUnmount(() => {
+  scrollEl.value?.removeEventListener('scroll', handleScroll)
+})
+
 const lineupPlayers = computed(() => {
   const ids = new Set(lineupStore.entries.map((e) => e.playerId))
   return playersStore.players.filter((p) => ids.has(p.id))
@@ -46,14 +58,11 @@ function playerName(id: string | null): string | null {
   return lineupPlayers.value.find((p) => p.id === id)?.name ?? null
 }
 
-// Chronologie complète, triée par minute
-const chronology = computed(() =>
-  [...eventsStore.events].sort((a, b) => a.minute - b.minute),
-)
+const chronology = computed(() => [...eventsStore.events].sort((a, b) => a.minute - b.minute))
 
 const eventTypeLabels: Record<string, string> = {
-  GOAL_FOR: '⚽ But',
-  GOAL_AGAINST: '⚽ But encaissé',
+  GOAL_FOR: 'But',
+  GOAL_AGAINST: 'But encaissé',
   SHOT_ON_TARGET: 'Tir cadré',
   SHOT_OFF_TARGET: 'Tir raté',
   CHANCE_CLEAR: 'Occasion nette',
@@ -62,17 +71,17 @@ const eventTypeLabels: Record<string, string> = {
   FREE_KICK_FOR: 'Coup franc',
   FREE_KICK_AGAINST: 'Coup franc concédé',
   DANGER_SUFFERED: 'Danger subi',
-  YELLOW_CARD: '🟨 Carton jaune',
-  RED_CARD: '🟥 Carton rouge',
-  SUBSTITUTION: '🔄 Remplacement',
+  YELLOW_CARD: 'Carton jaune',
+  RED_CARD: 'Carton rouge',
+  SUBSTITUTION: 'Remplacement',
 }
 
 function chronologyLabel(event: MatchEvent): string {
   if (event.type === 'GOAL_FOR') {
     const scorer = playerName(event.scorerId)
     const assist = playerName(event.assistId)
-    if (scorer && assist) return `⚽ But — ${scorer} (passe déc. : ${assist})`
-    if (scorer) return `⚽ But — ${scorer}`
+    if (scorer && assist) return `But — ${scorer} (passe déc. : ${assist})`
+    if (scorer) return `But — ${scorer}`
     return eventTypeLabels.GOAL_FOR
   }
   if (event.type === 'YELLOW_CARD' || event.type === 'RED_CARD') {
@@ -82,44 +91,11 @@ function chronologyLabel(event: MatchEvent): string {
   if (event.type === 'SUBSTITUTION') {
     const playerIn = playerName(event.playerInId)
     const playerOut = playerName(event.playerOutId)
-    if (playerIn && playerOut) return `🔄 ${playerIn} ↔ ${playerOut}`
+    if (playerIn && playerOut) return `${playerIn} ↔ ${playerOut}`
     return eventTypeLabels.SUBSTITUTION
   }
   return eventTypeLabels[event.type] ?? event.type
 }
-
-// Buteurs et passeurs décisifs, comptés sur les buts renseignés
-const scorers = computed(() => {
-  const counts = new Map<string, number>()
-  for (const e of eventsStore.events) {
-    if (e.type === 'GOAL_FOR' && e.scorerId) counts.set(e.scorerId, (counts.get(e.scorerId) ?? 0) + 1)
-  }
-  return [...counts.entries()]
-    .map(([id, count]) => ({ name: playerName(id) ?? 'Inconnu', count }))
-    .sort((a, b) => b.count - a.count)
-})
-
-const assists = computed(() => {
-  const counts = new Map<string, number>()
-  for (const e of eventsStore.events) {
-    if (e.type === 'GOAL_FOR' && e.assistId) counts.set(e.assistId, (counts.get(e.assistId) ?? 0) + 1)
-  }
-  return [...counts.entries()]
-    .map(([id, count]) => ({ name: playerName(id) ?? 'Inconnu', count }))
-    .sort((a, b) => b.count - a.count)
-})
-
-// Cartons nommés
-const cards = computed(() =>
-  eventsStore.events
-    .filter((e) => e.type === 'YELLOW_CARD' || e.type === 'RED_CARD')
-    .map((e) => ({
-      minute: e.minute,
-      type: e.type,
-      player: playerName(e.playerId) ?? 'Non précisé',
-    }))
-    .sort((a, b) => a.minute - b.minute),
-)
 
 function computeStats(events: MatchEvent[]): ReportStats {
   const count = (type: string) => events.filter((e) => e.type === type).length
@@ -144,6 +120,49 @@ function computeStats(events: MatchEvent[]): ReportStats {
 const scoreHome = computed(() => eventsStore.events.filter((e) => e.type === 'GOAL_FOR').length)
 const scoreAway = computed(() => eventsStore.events.filter((e) => e.type === 'GOAL_AGAINST').length)
 
+const matchDateLabel = computed(() => {
+  const date = matchStore.currentMatch?.date
+  if (!date) return ''
+  return new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+})
+
+const durationLabel = computed(() => {
+  const m = matchStore.currentMatch
+  if (!m || m.firstHalfMinutes == null) return null
+  return `${m.firstHalfMinutes + (m.secondHalfMinutes ?? 0)} min`
+})
+
+const shotsLabel = computed(() => {
+  if (!stats.value) return null
+  const total = stats.value.shotsOnTarget + stats.value.shotsOffTarget
+  return total > 0 ? `${total} tir${total > 1 ? 's' : ''}` : null
+})
+
+// 5 sections numérotées, construites depuis le contenu réel généré par l'IA
+// (summary/offensive/defensive/tactical/improvements — cf. report.store.ts).
+// La maquette en montre 6, la 6e ("Points forts") n'a pas d'équivalent généré
+// côté backend : plutôt que d'inventer du contenu, on s'arrête à 5.
+interface Section { num: string; title: string; body: string; list?: string[]; tone?: 'bad' }
+const sections = computed<Section[]>(() => {
+  const c = reportStore.report?.content
+  if (!c) return []
+  return [
+    { num: '01', title: 'Résumé du match', body: c.summary },
+    { num: '02', title: 'Jeu offensif', body: c.offensive },
+    { num: '03', title: 'Jeu défensif', body: c.defensive },
+    { num: '04', title: 'Lecture tactique', body: c.tactical },
+    { num: '05', title: 'Axes d\'amélioration', body: '', list: c.improvements, tone: 'bad' },
+  ]
+})
+
+const openSections = ref<Record<string, boolean>>({})
+function isOpen(num: string): boolean {
+  return openSections.value[num] !== false
+}
+function toggleSection(num: string) {
+  openSections.value[num] = !isOpen(num)
+}
+
 async function handleGenerate() {
   try {
     const returnedStats = await reportStore.generateReport(matchId)
@@ -152,216 +171,157 @@ async function handleGenerate() {
     // error déjà dans reportStore.error
   }
 }
+
+function openTimeline() {
+  router.push({ name: 'tracker', params: { id: matchId } })
+}
+
+function exportPdf() {
+  window.print()
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-950 text-white pb-20">
+  <div class="h-screen flex flex-col bg-app text-ink overflow-hidden">
 
     <!-- Header -->
-    <div class="sticky top-0 z-30 bg-neutral-950/80 backdrop-blur-sm border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <button
-        class="text-neutral-500 hover:text-white transition-colors p-1 -ml-1"
-        @click="router.push({ name: 'home' })"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-          <path d="m15 18-6-6 6-6" />
-        </svg>
+    <div class="flex-none flex items-center justify-between gap-2 px-4 py-3 border-b border-line">
+      <button class="text-[13px] font-medium text-ink-secondary hover:text-ink transition-colors" @click="router.push({ name: 'history' })">
+        ← Historique
       </button>
-      <div class="flex-1 min-w-0">
-        <h1 class="text-sm font-semibold text-white truncate">
-          {{ matchStore.currentMatch?.homeTeam }} vs {{ matchStore.currentMatch?.awayTeam }}
-        </h1>
-        <p class="text-xs text-neutral-500">{{ matchStore.currentMatch?.competition }}</p>
+      <div
+        class="flex items-center gap-2 overflow-hidden transition-all duration-200"
+        :style="{ opacity: scrolled ? 1 : 0, maxWidth: scrolled ? '220px' : '0px' }"
+      >
+        <span class="font-score text-sm font-bold tracking-[1px] text-ink whitespace-nowrap">{{ scoreHome }} - {{ scoreAway }}</span>
+        <span class="text-[11px] text-ink-meta whitespace-nowrap truncate">{{ matchStore.currentMatch?.homeTeam }} · {{ matchStore.currentMatch?.awayTeam }}</span>
       </div>
+      <span class="flex-none text-[11px] font-medium tracking-[.5px] text-brand-ink px-2 py-1 bg-brand-soft border border-brand-line rounded-full">Analyse IA</span>
     </div>
 
     <!-- Chargement initial -->
-    <div v-if="matchStore.loading" class="flex items-center justify-center py-20">
-      <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+    <div v-if="matchStore.loading" class="flex-1 flex items-center justify-center">
+      <div class="w-6 h-6 rounded-full border-2 border-line-strong border-t-ink animate-spin" />
     </div>
 
-    <template v-else>
+    <div v-else ref="scrollEl" class="flex-1 min-h-0 overflow-y-auto">
 
       <!-- Score final -->
-      <div class="flex flex-col items-center py-8 px-4">
-        <p class="text-xs uppercase tracking-widest text-neutral-500 mb-3">Score final</p>
-        <div class="flex items-center gap-4">
-          <span class="text-4xl font-bold tabular-nums text-white">{{ scoreHome }}</span>
-          <span class="text-2xl text-neutral-600">—</span>
-          <span class="text-4xl font-bold tabular-nums text-white">{{ scoreAway }}</span>
+      <div class="px-4 pt-5 pb-[18px] border-b border-line">
+        <div class="flex items-center justify-center gap-4">
+          <span class="flex-1 text-right text-[13px] font-semibold text-ink truncate">{{ matchStore.currentMatch?.homeTeam }}</span>
+          <span class="font-score text-[40px] font-bold tracking-[2px] text-ink whitespace-nowrap">{{ scoreHome }} - {{ scoreAway }}</span>
+          <span class="flex-1 text-[13px] font-semibold text-ink-secondary truncate">{{ matchStore.currentMatch?.awayTeam }}</span>
         </div>
-        <p class="text-xs text-neutral-500 mt-2">{{ matchStore.currentMatch?.date }}</p>
-      </div>
-
-      <!-- Grille de stats -->
-      <div v-if="stats" class="px-4 mb-6">
-        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">Statistiques</h2>
-        <div class="grid grid-cols-2 gap-2">
-          <div
-            v-for="item in [
-              { label: 'Tirs cadrés', value: stats.shotsOnTarget, color: 'text-blue-400' },
-              { label: 'Tirs non cadrés', value: stats.shotsOffTarget, color: 'text-indigo-400' },
-              { label: 'Occasions nettes', value: stats.clearChances, color: 'text-amber-400' },
-              { label: 'Corners', value: `${stats.cornersFor} / ${stats.cornersAgainst}`, color: 'text-cyan-400' },
-              { label: 'Coups francs', value: `${stats.freeKicksFor} / ${stats.freeKicksAgainst}`, color: 'text-violet-400' },
-              { label: 'Dangers subis', value: stats.dangersSuffered, color: 'text-red-400' },
-              { label: '🟨 Cartons jaunes', value: stats.yellowCards, color: 'text-yellow-400' },
-              { label: '🟥 Cartons rouges', value: stats.redCards, color: 'text-red-500' },
-            ]"
-            :key="item.label"
-            class="bg-white/5 border border-white/8 rounded-xl px-3 py-3"
-          >
-            <p class="text-xs text-neutral-500 mb-1">{{ item.label }}</p>
-            <p class="text-lg font-bold" :class="item.color">{{ item.value }}</p>
-          </div>
+        <p class="mt-2.5 text-center text-xs text-ink-meta">
+          {{ [matchStore.currentMatch?.competition, matchDateLabel].filter(Boolean).join(' · ') }}
+        </p>
+        <div class="flex justify-center flex-wrap gap-1.5 mt-3">
+          <span v-if="durationLabel" class="font-data text-[11px] text-ink-secondary px-2.5 py-1.5 bg-surface border border-line rounded-full">{{ durationLabel }}</span>
+          <span v-if="stats" class="font-data text-[11px] text-ink-secondary px-2.5 py-1.5 bg-surface border border-line rounded-full">{{ stats.totalEvents }} événement{{ stats.totalEvents > 1 ? 's' : '' }}</span>
+          <span v-if="shotsLabel" class="font-data text-[11px] text-ink-secondary px-2.5 py-1.5 bg-surface border border-line rounded-full">{{ shotsLabel }}</span>
         </div>
       </div>
 
-      <!-- Buteurs / passeurs décisifs -->
-      <div v-if="scorers.length > 0 || assists.length > 0" class="px-4 mb-6">
-        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">Buteurs & passeurs</h2>
-        <div class="grid grid-cols-2 gap-3">
-          <div v-if="scorers.length > 0" class="bg-white/5 border border-white/8 rounded-xl p-3">
-            <p class="text-xs text-neutral-500 mb-2">⚽ Buteurs</p>
-            <ul class="space-y-1">
-              <li v-for="s in scorers" :key="s.name" class="flex items-center justify-between text-sm">
-                <span class="text-neutral-200">{{ s.name }}</span>
-                <span class="text-neutral-500 tabular-nums">{{ s.count }}</span>
-              </li>
-            </ul>
-          </div>
-          <div v-if="assists.length > 0" class="bg-white/5 border border-white/8 rounded-xl p-3">
-            <p class="text-xs text-neutral-500 mb-2">🎯 Passes décisives</p>
-            <ul class="space-y-1">
-              <li v-for="a in assists" :key="a.name" class="flex items-center justify-between text-sm">
-                <span class="text-neutral-200">{{ a.name }}</span>
-                <span class="text-neutral-500 tabular-nums">{{ a.count }}</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <!-- Cartons -->
-      <div v-if="cards.length > 0" class="px-4 mb-6">
-        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">Cartons</h2>
-        <div class="bg-white/5 border border-white/8 rounded-xl divide-y divide-white/8">
-          <div v-for="(c, i) in cards" :key="i" class="flex items-center justify-between px-3 py-2">
-            <span class="text-sm text-neutral-200">
-              {{ c.type === 'RED_CARD' ? '🟥' : '🟨' }} {{ c.player }}
-            </span>
-            <span class="text-xs text-neutral-500 tabular-nums">{{ c.minute }}'</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Chronologie du match -->
-      <div v-if="chronology.length > 0" class="px-4 mb-6">
-        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">Chronologie</h2>
-        <div class="bg-white/5 border border-white/8 rounded-xl divide-y divide-white/8">
-          <div v-for="event in chronology" :key="event.id" class="flex items-center gap-3 px-3 py-2">
-            <span class="text-xs font-semibold text-neutral-500 tabular-nums w-8 shrink-0">{{ event.minute }}'</span>
-            <span class="text-sm text-neutral-200">{{ chronologyLabel(event) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Séparateur -->
-      <div class="mx-4 border-t border-white/10 mb-6" />
-
-      <!-- Section Rapport IA -->
-      <div class="px-4">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Analyse IA</h2>
-          <!-- Bouton regénérer si rapport déjà existant -->
-          <button
-            v-if="reportStore.report && !reportStore.generating"
-            class="text-xs text-neutral-600 hover:text-neutral-400 transition-colors"
-            @click="handleGenerate"
-          >
-            Regénérer
-          </button>
-        </div>
+      <div class="px-4 pt-1 pb-5">
 
         <!-- Erreur -->
-        <div v-if="reportStore.error" class="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
-          <p class="text-sm text-red-400">{{ reportStore.error }}</p>
-        </div>
+        <p v-if="reportStore.error" class="mt-4 text-sm text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2">
+          {{ reportStore.error }}
+        </p>
 
         <!-- Génération en cours -->
-        <div v-if="reportStore.generating" class="flex flex-col items-center py-12 gap-4">
-          <div class="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-          <p class="text-sm text-neutral-400">Analyse du match en cours…</p>
-          <p class="text-xs text-neutral-600">L'IA analyse vos données tactiques</p>
-        </div>
-
-        <!-- Bouton générer (si pas de rapport) -->
-        <div v-else-if="!reportStore.report && !reportStore.loading" class="text-center py-10">
-          <div class="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-4 text-2xl">
-            🤖
-          </div>
-          <p class="text-sm text-neutral-400 mb-1">Aucun rapport généré</p>
-          <p class="text-xs text-neutral-600 mb-6">L'IA va analyser les {{ stats?.totalEvents ?? 0 }} événements du match</p>
-          <button
-            class="h-12 px-8 rounded-xl bg-white text-neutral-900 text-sm font-semibold
-                   hover:bg-neutral-100 transition-all disabled:opacity-50"
-            :disabled="reportStore.generating"
-            @click="handleGenerate"
-          >
-            Générer l'analyse IA
-          </button>
+        <div v-if="reportStore.generating" class="flex flex-col items-center py-12 gap-3">
+          <div class="w-8 h-8 rounded-full border-2 border-line-strong border-t-ink animate-spin" />
+          <p class="text-sm text-ink-body">Analyse en cours…</p>
+          <p class="text-xs text-ink-meta">L'IA lit tes données tactiques</p>
         </div>
 
         <!-- Chargement rapport existant -->
         <div v-else-if="reportStore.loading" class="flex items-center justify-center py-10">
-          <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+          <div class="w-6 h-6 rounded-full border-2 border-line-strong border-t-ink animate-spin" />
         </div>
 
-        <!-- Rapport affiché -->
-        <div v-else-if="reportStore.report" class="space-y-4">
-
-          <!-- Résumé -->
-          <div class="bg-white/5 border border-white/8 rounded-xl p-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">Résumé</h3>
-            <p class="text-sm text-neutral-200 leading-relaxed">{{ reportStore.report.content.summary }}</p>
+        <!-- Pas de rapport -->
+        <div v-else-if="!reportStore.report" class="text-center py-10">
+          <div class="w-14 h-14 rounded-2xl bg-surface border border-line flex items-center justify-center mx-auto mb-4">
+            <Bot :size="24" :stroke-width="1.5" class="text-ink-meta" />
           </div>
-
-          <!-- Offensif -->
-          <div class="bg-green-500/5 border border-green-500/15 rounded-xl p-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-green-500 mb-2">⚡ Jeu offensif</h3>
-            <p class="text-sm text-neutral-200 leading-relaxed">{{ reportStore.report.content.offensive }}</p>
-          </div>
-
-          <!-- Défensif -->
-          <div class="bg-red-500/5 border border-red-500/15 rounded-xl p-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-red-400 mb-2">🛡️ Jeu défensif</h3>
-            <p class="text-sm text-neutral-200 leading-relaxed">{{ reportStore.report.content.defensive }}</p>
-          </div>
-
-          <!-- Tactique -->
-          <div class="bg-blue-500/5 border border-blue-500/15 rounded-xl p-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-blue-400 mb-2">🧠 Lecture tactique</h3>
-            <p class="text-sm text-neutral-200 leading-relaxed">{{ reportStore.report.content.tactical }}</p>
-          </div>
-
-          <!-- Axes d'amélioration -->
-          <div class="bg-amber-500/5 border border-amber-500/15 rounded-xl p-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-amber-400 mb-3">🎯 Axes d'amélioration</h3>
-            <ul class="space-y-2">
-              <li
-                v-for="(item, i) in reportStore.report.content.improvements"
-                :key="i"
-                class="flex items-start gap-2 text-sm text-neutral-200"
-              >
-                <span class="text-amber-500 font-bold shrink-0 mt-0.5">{{ i + 1 }}.</span>
-                <span class="leading-relaxed">{{ item }}</span>
-              </li>
-            </ul>
-          </div>
-
+          <p class="text-sm text-ink-body mb-1">Aucune analyse</p>
+          <p class="text-xs text-ink-meta mb-6">L'IA peut lire les {{ stats?.totalEvents ?? 0 }} événements saisis</p>
+          <button
+            class="h-12 px-8 rounded-btn bg-brand text-brand-soft text-sm font-semibold hover:bg-brand-hover disabled:opacity-50 transition-colors"
+            :disabled="reportStore.generating"
+            @click="handleGenerate"
+          >
+            Analyser le match
+          </button>
         </div>
+
+        <!-- Sections du rapport -->
+        <template v-else>
+          <div v-for="(s, i) in sections" :key="s.num">
+            <div
+              :class="s.tone === 'bad'
+                ? 'px-3.5 py-4 my-3.5 bg-[#1a0a0a] border-l-2 border-danger rounded-r-[10px]'
+                : (i < sections.length - 2 ? 'py-[18px] border-b border-line' : 'py-[18px]')"
+            >
+              <button class="w-full flex items-center gap-2.5 py-0.5 text-left" @click="toggleSection(s.num)">
+                <span class="flex-none font-data text-[11px] font-bold text-ink-disabled">{{ s.num }}</span>
+                <h2 class="flex-1 text-[15px] font-semibold text-ink">{{ s.title }}</h2>
+                <ChevronDown
+                  :size="14"
+                  :stroke-width="2"
+                  class="flex-none text-ink-disabled transition-transform"
+                  :style="{ transform: isOpen(s.num) ? 'rotate(0deg)' : 'rotate(-90deg)' }"
+                />
+              </button>
+              <template v-if="isOpen(s.num)">
+                <p v-if="s.body" class="mt-2.5 text-sm text-ink-body leading-[1.7]">{{ s.body }}</p>
+                <ul v-if="s.list" class="mt-2.5 flex flex-col gap-2">
+                  <li v-for="(item, idx) in s.list" :key="idx" class="flex items-start gap-2 text-sm text-ink-body leading-[1.7]">
+                    <span class="text-danger font-bold shrink-0">{{ idx + 1 }}.</span>
+                    {{ item }}
+                  </li>
+                </ul>
+              </template>
+            </div>
+          </div>
+
+          <button class="block mx-auto mt-1 text-xs text-ink-meta hover:text-ink-secondary transition-colors" @click="handleGenerate">
+            Réanalyser
+          </button>
+
+          <!-- Chronologie (donnée factuelle, pas de l'IA — gardée hors des sections numérotées) -->
+          <div v-if="chronology.length > 0" class="mt-5 pt-4 border-t border-line">
+            <h2 class="text-[13px] font-semibold text-ink mb-3">Chronologie</h2>
+            <div class="bg-surface border border-line rounded-card divide-y divide-line">
+              <div v-for="event in chronology" :key="event.id" class="flex items-center gap-2.5 px-3 py-2">
+                <span class="font-score text-xs font-bold text-ink-meta w-7 shrink-0">{{ event.minute }}'</span>
+                <span class="text-sm text-ink-body">{{ chronologyLabel(event) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2 mt-5">
+            <button
+              class="h-12 rounded-btn border border-line bg-surface text-ink text-sm font-medium hover:bg-surface-hover transition-colors"
+              @click="exportPdf"
+            >
+              Exporter en PDF
+            </button>
+            <button
+              class="h-12 rounded-btn border border-line bg-transparent text-ink-secondary text-sm font-medium hover:text-ink hover:bg-surface transition-colors"
+              @click="openTimeline"
+            >
+              Revoir la timeline
+            </button>
+          </div>
+          <p class="mt-4 text-center text-[11px] text-ink-disabled leading-[1.6]">
+            Analyse produite à partir des {{ stats?.totalEvents ?? 0 }} événements saisis — relis-la avant de la partager.
+          </p>
+        </template>
       </div>
-
-    </template>
+    </div>
   </div>
 </template>

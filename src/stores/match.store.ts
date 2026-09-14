@@ -19,6 +19,7 @@ function rowToMatch(row: Record<string, unknown>): Match {
     secondHalfMinutes: row.second_half_minutes as number | null,
     clubId: row.club_id as string | null,
     teamId: row.team_id as string | null,
+    formation: (row.formation as string | null) ?? null,
     createdBy: row.created_by as string,
   }
 }
@@ -137,5 +138,15 @@ export const useMatchStore = defineStore('match', () => {
     if (currentMatch.value?.id === id) Object.assign(currentMatch.value, { status: 'FINISHED', ...durations })
   }
 
-  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatchStatus, finishMatch }
+  // Enregistre la formation choisie pour la composition (ex. "4-4-2")
+  async function updateFormation(id: string, formation: string) {
+    const { error: sbError } = await supabase.from('matches').update({ formation }).eq('id', id)
+    if (sbError) throw sbError
+
+    const idx = matches.value.findIndex((m) => m.id === id)
+    if (idx !== -1) matches.value[idx].formation = formation
+    if (currentMatch.value?.id === id) currentMatch.value.formation = formation
+  }
+
+  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatchStatus, finishMatch, updateFormation }
 })

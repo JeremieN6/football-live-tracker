@@ -101,6 +101,11 @@ export interface LineupEntry {
   matchId: string
   playerId: string
   role: LineupRole
+  // Position tactique nommée (ex. "dg", "mcg") pour un STARTER placé sur le
+  // terrain de composition — absente pour un SUB, ou un STARTER non encore
+  // positionné (rétrocompatibilité avec l'ancienne saisie STARTER/SUB seule).
+  slotId: string | null
+  slotLabel: string | null
   createdBy: string
   createdAt: string
 }
@@ -120,6 +125,8 @@ export interface Match {
   // Équipe du club concernée par ce match (ex: Équipe 1, Équipe réserve)
   clubId: string | null
   teamId: string | null
+  // Formation choisie pour la composition (ex. "4-4-2") — null tant qu'aucune n'a été enregistrée
+  formation: string | null
   createdBy: string
 }
 

@@ -13,6 +13,8 @@ export type EventType =
   | 'DANGER_SUFFERED'
   | 'CORNER_AGAINST'
   | 'FREE_KICK_AGAINST'
+  | 'FOUL_COMMITTED'
+  | 'FOUL_SUFFERED'
   // Disciplinaire / Tactique
   | 'YELLOW_CARD'
   | 'RED_CARD'

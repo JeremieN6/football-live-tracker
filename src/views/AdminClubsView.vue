@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ArrowLeft } from 'lucide-vue-next'
 import { useAdminClubsStore } from '@/stores/adminClubs.store'
 import { extractErrorMessage } from '@/lib/errors'
 
@@ -61,70 +62,65 @@ async function handleReject(id: string, name: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-950 text-white pb-20">
+  <div class="min-h-screen bg-app flex flex-col text-ink">
 
-    <!-- Header -->
-    <div class="sticky top-0 z-30 bg-neutral-950/80 backdrop-blur-sm border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <button
-        class="text-neutral-500 hover:text-white transition-colors p-1 -ml-1"
-        @click="router.push({ name: 'home' })"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-          <path d="m15 18-6-6 6-6" />
-        </svg>
+    <div class="flex-none flex items-center gap-1 px-4 pt-3.5 pb-2">
+      <button class="p-1 -ml-1 text-ink-meta hover:text-ink transition-colors" @click="router.push({ name: 'home' })">
+        <ArrowLeft :size="18" :stroke-width="2" />
       </button>
-      <h1 class="text-sm font-semibold text-white">Administration — Clubs en attente</h1>
+      <h1 class="text-[20px] font-semibold text-ink">Administration</h1>
     </div>
 
-    <div class="px-4 pt-5 max-w-3xl mx-auto">
+    <main class="flex-1 px-4 pb-8 max-w-2xl w-full mx-auto">
 
       <div v-if="checking" class="flex items-center justify-center py-10">
-        <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+        <div class="w-6 h-6 rounded-full border-2 border-line-strong border-t-ink animate-spin" />
       </div>
 
-      <p v-else-if="!adminStore.isAdmin" class="text-sm text-neutral-400 bg-white/5 border border-white/10 rounded-lg px-3 py-3">
+      <p v-else-if="!adminStore.isAdmin" class="text-sm text-ink-secondary bg-surface border border-line rounded-card px-3 py-3">
         Accès réservé aux administrateurs de la plateforme.
       </p>
 
       <template v-else>
-        <p v-if="errorMessage" class="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2 mb-4">
+        <p v-if="errorMessage" class="text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2 mb-4">
           {{ errorMessage }}
         </p>
 
-        <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">
-          Clubs en attente ({{ adminStore.pendingClubs.length }})
-        </h2>
-
-        <div v-if="adminStore.loading" class="flex items-center justify-center py-10">
-          <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+        <div class="flex items-baseline justify-between mb-3 mt-2">
+          <h2 class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Clubs en attente</h2>
+          <span class="font-data text-[11px] text-ink-disabled">{{ adminStore.pendingClubs.length }}</span>
         </div>
 
-        <p v-else-if="adminStore.pendingClubs.length === 0" class="text-sm text-neutral-600 text-center py-8">
+        <div v-if="adminStore.loading" class="flex items-center justify-center py-10">
+          <div class="w-6 h-6 rounded-full border-2 border-line-strong border-t-ink animate-spin" />
+        </div>
+
+        <p v-else-if="adminStore.pendingClubs.length === 0" class="text-sm text-ink-meta text-center py-8">
           Aucun club en attente de validation.
         </p>
 
-        <div v-else class="space-y-1.5">
+        <div v-else class="flex flex-col gap-1.5">
           <div
             v-for="c in adminStore.pendingClubs"
             :key="c.id"
-            class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/8"
+            class="flex items-center gap-3 px-3.5 py-3 rounded-card bg-surface border border-line"
           >
             <div class="flex-1 min-w-0">
-              <p class="text-sm text-white font-medium truncate">{{ c.name }}</p>
-              <p class="text-xs text-neutral-500 truncate">
+              <p class="text-sm text-ink font-medium truncate">{{ c.name }}</p>
+              <p class="text-[11px] text-ink-meta truncate mt-0.5">
                 Créé le {{ formatDate(c.createdAt) }} · owner {{ c.ownerId.slice(0, 8) }}…
               </p>
             </div>
             <button
               :disabled="actioningId === c.id"
-              class="text-xs text-red-400 hover:bg-red-500/10 px-2 py-1 rounded-md transition-colors disabled:opacity-50"
+              class="text-xs text-danger hover:bg-danger-soft px-2.5 py-1.5 rounded-input transition-colors disabled:opacity-50"
               @click="handleReject(c.id, c.name)"
             >
               Rejeter
             </button>
             <button
               :disabled="actioningId === c.id"
-              class="text-xs text-neutral-900 bg-white hover:bg-neutral-100 px-3 py-1.5 rounded-md font-semibold transition-colors disabled:opacity-50"
+              class="text-xs text-brand-soft bg-brand hover:bg-brand-hover px-3 py-1.5 rounded-input font-semibold transition-colors disabled:opacity-50"
               @click="handleApprove(c.id)"
             >
               Valider
@@ -132,6 +128,6 @@ async function handleReject(id: string, name: string) {
           </div>
         </div>
       </template>
-    </div>
+    </main>
   </div>
 </template>

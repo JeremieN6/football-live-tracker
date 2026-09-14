@@ -71,6 +71,8 @@ const eventTypeLabels: Record<string, string> = {
   CORNER_AGAINST: 'Corner concédé',
   FREE_KICK_FOR: 'Coup franc',
   FREE_KICK_AGAINST: 'Coup franc concédé',
+  FOUL_SUFFERED: 'Faute subie',
+  FOUL_COMMITTED: 'Faute commise',
   DANGER_SUFFERED: 'Danger subi',
   YELLOW_CARD: 'Carton jaune',
   RED_CARD: 'Carton rouge',

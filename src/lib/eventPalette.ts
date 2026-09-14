@@ -10,6 +10,7 @@ import {
   ShieldAlert,
   ArrowLeftRight,
   RectangleVertical,
+  Hand,
 } from 'lucide-vue-next'
 import type { EventType } from '@/types/match.types'
 
@@ -36,10 +37,12 @@ export const EVENT_PALETTE: EventMeta[] = [
   { type: 'SHOT_OFF_TARGET', label: 'Tir non cadré', color: '#9CA3AF', bg: '#1c1917', border: '#374151', group: 'Offensif', icon: CircleDot },
   { type: 'CORNER_FOR', label: 'Corner', color: '#60A5FA', bg: '#172554', border: '#1e40af', group: 'Offensif', icon: CornerUpRight },
   { type: 'FREE_KICK_FOR', label: 'Coup franc', color: '#93C5FD', bg: '#172554', border: '#1e40af', group: 'Offensif', icon: Flag },
+  { type: 'FOUL_SUFFERED', label: 'Faute subie', color: '#4ADE80', bg: '#052e16', border: '#166534', group: 'Offensif', icon: Hand },
   { type: 'GOAL_AGAINST', label: 'But concédé', color: '#F87171', bg: '#450a0a', border: '#7f1d1d', group: 'Défensif', icon: Goal },
   { type: 'DANGER_SUFFERED', label: 'Danger subi', color: '#F87171', bg: '#450a0a', border: '#7f1d1d', group: 'Défensif', icon: ShieldAlert },
   { type: 'CORNER_AGAINST', label: 'Corner concédé', color: '#FB923C', bg: '#431407', border: '#9a3412', group: 'Défensif', icon: CornerDownRight },
   { type: 'FREE_KICK_AGAINST', label: 'Coup franc concédé', color: '#F472B6', bg: '#500724', border: '#9d174d', group: 'Défensif', icon: Flag },
+  { type: 'FOUL_COMMITTED', label: 'Faute commise', color: '#FB923C', bg: '#431407', border: '#9a3412', group: 'Défensif', icon: Hand },
   { type: 'SUBSTITUTION', label: 'Remplacement', color: '#A8A29E', bg: '#1c1917', border: '#78716c', group: 'Défensif', icon: ArrowLeftRight },
   { type: 'YELLOW_CARD', label: 'Carton jaune', color: '#FBBF24', bg: '#451a03', border: '#78716c', group: 'Disciplinaire', icon: RectangleVertical },
   { type: 'RED_CARD', label: 'Carton rouge', color: '#EF4444', bg: '#450a0a', border: '#7f1d1d', group: 'Disciplinaire', icon: RectangleVertical },

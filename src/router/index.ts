@@ -53,6 +53,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ClubSettingsView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/club/teams/:id/stats',
+    name: 'team-stats',
+    component: () => import('@/views/TeamStatsView.vue'),
+    meta: { requiresAuth: true },
+  },
   // Anciennes URLs, conservées comme redirections pour ne pas casser d'éventuels favoris/liens.
   { path: '/teams', redirect: { name: 'club', query: { tab: 'teams' } } },
   { path: '/roster', redirect: { name: 'club', query: { tab: 'roster' } } },

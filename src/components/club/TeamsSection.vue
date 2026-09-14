@@ -171,11 +171,16 @@ async function handleDelete(id: string) {
                 {{ teamPlayers(team.id).length }} joueur{{ teamPlayers(team.id).length > 1 ? 's' : '' }}<span v-if="team.division"> · {{ team.division }}</span>
               </span>
             </div>
-            <p v-if="teamStats(team.id).played > 0" class="font-data text-[10px] text-ink-disabled mt-1">
+            <button
+              v-if="teamStats(team.id).played > 0"
+              type="button"
+              class="font-data text-[10px] text-ink-disabled mt-1 hover:text-brand-ink transition-colors"
+              @click.stop="router.push({ name: 'team-stats', params: { id: team.id } })"
+            >
               {{ teamStats(team.id).played }} match{{ teamStats(team.id).played > 1 ? 's' : '' }} ·
               {{ teamStats(team.id).wins }}V {{ teamStats(team.id).draws }}N {{ teamStats(team.id).losses }}D ·
-              {{ teamStats(team.id).goalsFor }}-{{ teamStats(team.id).goalsAgainst }}
-            </p>
+              {{ teamStats(team.id).goalsFor }}-{{ teamStats(team.id).goalsAgainst }} · voir plus
+            </button>
           </div>
           <ChevronDown
             :size="16"

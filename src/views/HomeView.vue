@@ -305,7 +305,12 @@ const clubMeta = computed(() => {
           <span class="text-[13px] font-medium text-ink-secondary">Équipes</span>
           <p v-if="teamsStore.teams.length === 0" class="mt-2.5 text-xs text-ink-meta">Aucune équipe</p>
           <div v-else class="flex flex-col gap-[7px] mt-[11px]">
-            <div v-for="t in teamsStore.teams" :key="t.id" class="flex items-center justify-between gap-2 min-w-0">
+            <div
+              v-for="t in teamsStore.teams"
+              :key="t.id"
+              class="flex items-center justify-between gap-2 min-w-0"
+              @click.stop="router.push({ name: 'team-stats', params: { id: t.id } })"
+            >
               <div class="min-w-0">
                 <div class="text-xs font-semibold text-ink truncate">{{ t.name }}</div>
                 <div v-if="t.category" class="mt-0.5 text-[10px] text-ink-meta truncate">{{ t.category }}</div>

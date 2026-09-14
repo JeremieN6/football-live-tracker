@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ArrowLeft } from 'lucide-vue-next'
 import { useMatchStore } from '@/stores/match.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
+import { MATCH_STATUS_BADGES, outcomeFor } from '@/lib/matchBadges'
 import CreateMatchModal from '@/components/tracker/CreateMatchModal.vue'
+import type { Match } from '@/types/match.types'
 
 const router = useRouter()
 const matchStore = useMatchStore()
@@ -12,7 +15,8 @@ const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
 
 const showCreateModal = ref(false)
-const filterTeamId = ref<string | 'ALL'>('ALL')
+const activeTeam = ref<string>('ALL')
+const openId = ref<string | null>(null)
 
 onMounted(async () => {
   matchStore.fetchMatches()
@@ -20,175 +24,200 @@ onMounted(async () => {
   if (club) await teamsStore.fetchTeams(club.id)
 })
 
-function teamName(id: string | null): string {
-  if (!id) return 'Sans équipe'
-  return teamsStore.teams.find((t) => t.id === id)?.name ?? 'Équipe inconnue'
+function matchLabel(m: Match): string {
+  return `${m.homeTeam} vs ${m.awayTeam}`
+}
+function day(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric' })
+}
+function month(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('fr-FR', { month: 'short' })
 }
 
-// Formate la date en "1 mai 2026"
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-// Badge couleur selon le statut du match
-const statusConfig = {
-  PENDING: { label: 'À venir', class: 'bg-neutral-700 text-neutral-300' },
-  LIVE: { label: 'En cours', class: 'bg-green-500/20 text-green-400 animate-pulse' },
-  FINISHED: { label: 'Terminé', class: 'bg-neutral-800 text-neutral-500' },
-} as const
-
-function goToTracker(id: string) {
-  router.push({ name: 'tracker', params: { id } })
-}
-
-function goToReport(id: string) {
-  router.push({ name: 'report', params: { id } })
-}
-
-const filteredMatches = computed(() => {
-  if (filterTeamId.value === 'ALL') return matchStore.matches
-  return matchStore.matches.filter((m) => m.teamId === filterTeamId.value)
+const teamTabs = computed(() => {
+  const all = { id: 'ALL', label: 'Toutes', count: matchStore.matches.length }
+  const teams = teamsStore.teams.map((t) => ({
+    id: t.id,
+    label: t.name,
+    count: matchStore.matches.filter((m) => m.teamId === t.id).length,
+  }))
+  return [all, ...teams]
 })
 
-const hasMatches = computed(() => matchStore.matches.length > 0)
-const hasFilteredMatches = computed(() => filteredMatches.value.length > 0)
+const filteredMatches = computed(() =>
+  [...matchStore.matches]
+    .filter((m) => activeTeam.value === 'ALL' || m.teamId === activeTeam.value)
+    .sort((a, b) => b.date.localeCompare(a.date)),
+)
+
+const isEmpty = computed(() => filteredMatches.value.length === 0)
+
+const summary = computed(() => {
+  const n = filteredMatches.value.length
+  const activeLabel = teamTabs.value.find((t) => t.id === activeTeam.value)?.label
+  const base = `${n} match${n > 1 ? 's' : ''}`
+  return activeTeam.value === 'ALL' ? base : `${base} · ${activeLabel}`
+})
+
+const record = computed(() => {
+  const done = filteredMatches.value.filter((m) => m.status === 'FINISHED')
+  if (done.length === 0) return '—'
+  const tally = { V: 0, N: 0, D: 0 }
+  for (const m of done) tally[outcomeFor(m.scoreHome, m.scoreAway)]++
+  return `${tally.V}V ${tally.N}N ${tally.D}D`
+})
+
+function toggleOpen(id: string) {
+  openId.value = openId.value === id ? null : id
+}
+
+function scoreDisplay(m: Match): string {
+  return m.status === 'PENDING' ? '—' : `${m.scoreHome} – ${m.scoreAway}`
+}
+function scoreColorClass(m: Match): string {
+  if (m.status === 'FINISHED') return 'text-ink'
+  if (m.status === 'LIVE') return 'text-brand-ink'
+  return 'text-ink-meta'
+}
+
+// Miroir de la logique de CTA de HomeView : le match le plus proche se lance
+// directement, les suivants passent par la préparation de compo.
+function primaryLabel(m: Match): string {
+  if (m.status === 'FINISHED') return 'Voir le rapport'
+  if (m.status === 'LIVE') return 'Ouvrir le tracker'
+  return 'Préparer la compo'
+}
+function primaryAction(m: Match) {
+  if (m.status === 'FINISHED') router.push({ name: 'report', params: { id: m.id } })
+  else if (m.status === 'LIVE') router.push({ name: 'tracker', params: { id: m.id } })
+  else router.push({ name: 'lineup', params: { id: m.id } })
+}
+function openDetails(m: Match) {
+  router.push({ name: 'report', params: { id: m.id } })
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-950 text-white">
+  <div class="min-h-screen bg-app flex flex-col text-ink">
 
-    <!-- Header -->
-    <div class="sticky top-0 z-30 bg-neutral-950/80 backdrop-blur-sm border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <button
-        class="text-neutral-500 hover:text-white transition-colors p-1 -ml-1"
-        @click="router.push({ name: 'home' })"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-          <path d="m15 18-6-6 6-6" />
-        </svg>
-      </button>
-      <h1 class="text-sm font-semibold text-white">Matchs</h1>
-    </div>
-
-    <!-- Contenu principal -->
-    <main class="max-w-2xl mx-auto px-4 py-6">
-
-      <!-- Bouton nouveau match -->
-      <div class="flex items-center justify-end mb-4">
+    <div class="flex-none px-4 pt-3.5">
+      <div class="flex items-center justify-between gap-2.5">
+        <div class="flex items-center gap-1">
+          <button class="p-1 -ml-1 text-ink-meta hover:text-ink transition-colors" @click="router.push({ name: 'home' })">
+            <ArrowLeft :size="18" :stroke-width="2" />
+          </button>
+          <h1 class="text-[20px] font-semibold text-ink">Matchs</h1>
+        </div>
         <button
           v-if="clubsStore.canWrite"
-          class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-white text-neutral-900 text-sm font-semibold
-                 hover:bg-neutral-100 transition-all"
+          class="h-9 px-3 rounded-[9px] border border-brand-line bg-brand text-brand-soft font-semibold text-xs hover:bg-brand-hover transition-colors"
           @click="showCreateModal = true"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
           Nouveau match
         </button>
       </div>
 
-      <!-- Filtre par équipe (utile dès qu'il y a plus d'une équipe) -->
-      <div v-if="teamsStore.teams.length > 1" class="mb-6">
-        <select
-          v-model="filterTeamId"
-          class="w-full sm:w-auto h-9 px-3 rounded-lg bg-white/5 border border-white/10 text-white
-                 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
+      <!-- Tabs d'équipe -->
+      <div class="flex gap-1.5 mt-3 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+        <button
+          v-for="t in teamTabs"
+          :key="t.id"
+          class="flex items-center gap-1.5 flex-none h-[34px] px-3 rounded-full text-xs font-medium whitespace-nowrap border transition-colors"
+          :class="activeTeam === t.id ? 'bg-brand-soft border-brand-line text-brand-ink' : 'bg-surface border-line text-ink-secondary'"
+          @click="activeTeam = t.id; openId = null"
         >
-          <option value="ALL">Toutes les équipes</option>
-          <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">{{ t.name }}</option>
-        </select>
+          {{ t.label }}
+          <span class="font-data text-[10px]" :class="activeTeam === t.id ? 'text-brand-line' : 'text-ink-disabled'">{{ t.count }}</span>
+        </button>
       </div>
 
-      <!-- État de chargement -->
-      <div v-if="matchStore.loading" class="space-y-3">
-        <div v-for="i in 3" :key="i" class="h-20 rounded-xl bg-white/5 animate-pulse" />
+      <div class="flex items-baseline justify-between mt-3 px-0.5 pb-2 border-b border-line">
+        <span class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">{{ summary }}</span>
+        <span class="font-data text-[11px] text-ink-meta">{{ record }}</span>
+      </div>
+    </div>
+
+    <div class="flex-1 min-h-0 overflow-y-auto">
+
+      <!-- Chargement -->
+      <div v-if="matchStore.loading" class="p-4 space-y-2">
+        <div v-for="i in 4" :key="i" class="h-14 rounded-card bg-surface animate-pulse" />
       </div>
 
       <!-- Erreur -->
-      <p v-else-if="matchStore.error" class="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-3">
+      <p v-else-if="matchStore.error" class="m-4 text-sm text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2">
         {{ matchStore.error }}
       </p>
 
-      <!-- Liste des matchs -->
-      <div v-else-if="hasFilteredMatches" class="space-y-3">
-        <div
-          v-for="match in filteredMatches"
-          :key="match.id"
-          class="group bg-white/5 border border-white/10 rounded-xl px-4 py-4 hover:bg-white/8 hover:border-white/20 transition-all cursor-pointer"
-          @click="match.status === 'FINISHED' ? goToReport(match.id) : goToTracker(match.id)"
-        >
-          <div class="flex items-start justify-between gap-3">
-
-            <!-- Équipes + score -->
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-3">
-                <span class="font-semibold text-sm truncate">{{ match.homeTeam }}</span>
-                <span
-                  v-if="match.status !== 'PENDING'"
-                  class="text-sm font-bold tabular-nums text-white shrink-0"
-                >
-                  {{ match.scoreHome }} – {{ match.scoreAway }}
-                </span>
-                <span v-else class="text-neutral-600 text-xs shrink-0">vs</span>
-                <span class="font-semibold text-sm truncate">{{ match.awayTeam }}</span>
-              </div>
-              <div class="flex items-center gap-2 mt-1.5">
-                <span class="text-xs text-violet-400 font-medium">{{ teamName(match.teamId) }}</span>
-                <span class="text-neutral-700">·</span>
-                <span class="text-xs text-neutral-500">{{ formatDate(match.date) }}</span>
-                <span v-if="match.competition" class="text-neutral-700">·</span>
-                <span v-if="match.competition" class="text-xs text-neutral-500 truncate">{{ match.competition }}</span>
-              </div>
-            </div>
-
-            <!-- Badge statut + action -->
-            <div class="flex flex-col items-end gap-2 shrink-0">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="statusConfig[match.status].class">
-                {{ statusConfig[match.status].label }}
-              </span>
-              <span class="text-xs text-neutral-600 group-hover:text-neutral-400 transition-colors">
-                {{ match.status === 'FINISHED' ? 'Voir le rapport →' : 'Continuer →' }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Aucun résultat pour le filtre actif -->
-      <p v-else-if="hasMatches" class="text-sm text-neutral-600 text-center py-8">
-        Aucun match pour cette équipe.
-      </p>
-
       <!-- État vide -->
-      <div v-else class="text-center py-20">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/5 mb-4">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-7 h-7 text-neutral-600">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 2a10 10 0 0 1 0 20M2 12h20M12 2c-2.5 3-4 6.3-4 10s1.5 7 4 10M12 2c2.5 3 4 6.3 4 10s-1.5 7-4 10" />
-          </svg>
-        </div>
-        <p class="text-neutral-400 font-medium mb-1">Aucun match pour l'instant</p>
-        <p class="text-sm text-neutral-600 mb-6">
-          {{ clubsStore.canWrite ? 'Créez votre premier match pour commencer l\'analyse.' : 'Aucun match créé pour le moment.' }}
-        </p>
+      <div v-else-if="isEmpty" class="m-4 px-5 py-[26px] bg-surface border border-line rounded-card text-center">
+        <p class="mb-3.5 text-sm text-ink-secondary leading-relaxed">Aucun match pour cette équipe — crée le premier</p>
         <button
           v-if="clubsStore.canWrite"
-          class="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-white text-neutral-900 text-sm font-semibold
-                 hover:bg-neutral-100 transition-all"
+          class="h-11 px-4 rounded-btn border border-brand-line bg-brand-soft text-brand-ink text-[13px] font-medium hover:bg-[#0a3d1c] transition-colors"
           @click="showCreateModal = true"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Nouveau match
+          Créer un match
         </button>
       </div>
-    </main>
+
+      <!-- Liste -->
+      <template v-else>
+        <div
+          v-for="(m, i) in filteredMatches"
+          :key="m.id"
+          class="border-b border-[rgba(55,65,81,.5)]"
+          :class="openId === m.id ? 'bg-surface-hover' : (i % 2 ? 'bg-surface-sub' : 'bg-app')"
+        >
+          <div class="flex items-center gap-2.5 px-4 py-[11px] cursor-pointer" @click="toggleOpen(m.id)">
+            <div class="flex-none w-[34px] text-center">
+              <div class="font-score text-[13px] font-bold text-ink-body">{{ day(m.date) }}</div>
+              <div class="text-[9px] font-medium tracking-[.5px] text-ink-meta">{{ month(m.date) }}</div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[13px] font-medium text-ink truncate">{{ matchLabel(m) }}</p>
+              <div class="flex items-center gap-1.5 mt-[3px] min-w-0">
+                <span
+                  class="inline-flex items-center gap-[5px] flex-none px-[7px] py-[3px] rounded-full text-[9.5px] font-medium tracking-[.3px] whitespace-nowrap border"
+                  :style="{
+                    background: MATCH_STATUS_BADGES[m.status].bg,
+                    borderColor: MATCH_STATUS_BADGES[m.status].border,
+                    color: MATCH_STATUS_BADGES[m.status].fg,
+                  }"
+                >
+                  <span
+                    class="w-[5px] h-[5px] rounded-full"
+                    :class="m.status === 'LIVE' ? 'animate-nrv-pulse' : ''"
+                    :style="{ background: MATCH_STATUS_BADGES[m.status].dot }"
+                  />
+                  {{ MATCH_STATUS_BADGES[m.status].label }}
+                </span>
+                <span v-if="m.competition" class="text-[10.5px] text-ink-meta truncate">{{ m.competition }}</span>
+              </div>
+            </div>
+            <div class="flex-none text-right min-w-[42px]">
+              <span class="font-score text-[15px] font-bold" :class="scoreColorClass(m)">{{ scoreDisplay(m) }}</span>
+            </div>
+          </div>
+
+          <div v-if="openId === m.id" class="flex gap-1.5 px-4 pb-3">
+            <button
+              class="flex-1 h-10 rounded-[9px] text-xs font-medium"
+              :class="m.status === 'FINISHED' ? 'bg-surface border border-line-strong text-ink' : 'bg-brand border border-brand-line text-brand-soft'"
+              @click.stop="primaryAction(m)"
+            >
+              {{ primaryLabel(m) }}
+            </button>
+            <button
+              class="flex-none h-10 px-3 rounded-[9px] border border-line text-ink-secondary text-xs font-medium hover:text-ink hover:bg-surface transition-colors"
+              @click.stop="openDetails(m)"
+            >
+              Détails
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
 
     <!-- Modal création match -->
     <CreateMatchModal v-if="showCreateModal" @close="showCreateModal = false" />

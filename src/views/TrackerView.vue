@@ -228,7 +228,7 @@ async function handleFinishMatch() {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col bg-app text-ink overflow-hidden">
+  <div class="h-dvh flex flex-col bg-app text-ink overflow-hidden">
 
     <!-- Chargement -->
     <div v-if="matchStore.loading" class="flex-1 flex items-center justify-center">
@@ -247,6 +247,7 @@ async function handleFinishMatch() {
         :away-team="matchStore.currentMatch?.awayTeam ?? ''"
         :meta="teamMeta"
         :can-control="clubsStore.canWrite"
+        :added-time-display="timer.addedTimeDisplay.value"
         @start="timer.start()"
         @pause="timer.pause()"
         @switch-half="handleSwitchHalf"

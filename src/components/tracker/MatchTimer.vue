@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { Half } from '@/types/match.types'
 
 const props = defineProps<{
@@ -11,6 +12,7 @@ const props = defineProps<{
   awayTeam: string
   meta: string
   canControl?: boolean
+  addedTimeDisplay?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -19,6 +21,12 @@ const emit = defineEmits<{
   switchHalf: []
   reset: []
 }>()
+
+const showResetConfirm = ref(false)
+function confirmReset() {
+  showResetConfirm.value = false
+  emit('reset')
+}
 </script>
 
 <template>
@@ -37,8 +45,14 @@ const emit = defineEmits<{
     </div>
 
     <!-- Chrono -->
-    <div class="flex items-baseline justify-center gap-2.5 mt-0.5">
+    <div class="flex items-baseline justify-center gap-2 mt-0.5">
       <span class="font-score text-[36px] font-bold leading-[1.1] text-ink">{{ props.display }}</span>
+      <span
+        v-if="props.addedTimeDisplay"
+        class="font-score text-[15px] font-bold text-warning animate-nrv-pulse"
+      >
+        {{ props.addedTimeDisplay }}
+      </span>
       <span class="text-[11px] font-medium tracking-[.5px] text-brand-ink">{{ props.half === 1 ? '1re mi-temps' : '2e mi-temps' }}</span>
     </div>
 
@@ -63,7 +77,7 @@ const emit = defineEmits<{
       </button>
       <button
         class="h-9 rounded-input border border-line bg-surface text-ink-secondary text-xs font-medium hover:bg-surface-hover hover:border-line-strong transition-colors"
-        @click="emit('reset')"
+        @click="showResetConfirm = true"
       >
         Reset
       </button>
@@ -73,5 +87,33 @@ const emit = defineEmits<{
     <p v-else class="mt-2.5 text-xs text-ink-meta bg-surface border border-line rounded-input px-3 py-2 text-center">
       Lecture seule — tu n'as pas les droits pour saisir des événements sur ce match.
     </p>
+
+    <!-- Confirmation reset -->
+    <div
+      v-if="showResetConfirm"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
+      @click.self="showResetConfirm = false"
+    >
+      <div class="w-full max-w-sm bg-surface border border-line rounded-card p-6">
+        <h2 class="text-base font-semibold text-ink mb-1">Réinitialiser le chrono ?</h2>
+        <p class="text-sm text-ink-secondary mb-5">
+          Le chrono repart de zéro en 1re mi-temps. Les événements déjà saisis ne sont pas supprimés.
+        </p>
+        <div class="flex gap-3">
+          <button
+            class="flex-1 h-11 rounded-btn border border-line text-ink-secondary text-sm font-medium hover:text-ink transition-colors"
+            @click="showResetConfirm = false"
+          >
+            Annuler
+          </button>
+          <button
+            class="flex-1 h-11 rounded-btn bg-danger text-white text-sm font-semibold hover:opacity-90 transition-colors"
+            @click="confirmReset"
+          >
+            Réinitialiser
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

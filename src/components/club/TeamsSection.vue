@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Users, ChevronDown, Plus, X } from 'lucide-vue-next'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
@@ -7,6 +8,7 @@ import { usePlayersStore } from '@/stores/players.store'
 import { useMatchStore } from '@/stores/match.store'
 import { extractErrorMessage } from '@/lib/errors'
 
+const router = useRouter()
 const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
 const playersStore = usePlayersStore()
@@ -188,13 +190,15 @@ async function handleDelete(id: string) {
             Aucun joueur assigné à cette équipe pour le moment.
           </p>
           <div v-else class="flex flex-wrap gap-1.5 pt-3">
-            <span
+            <button
               v-for="p in teamPlayers(team.id)"
               :key="p.id"
-              class="text-xs text-ink-body bg-surface-sub border border-line rounded-full px-2.5 py-1"
+              type="button"
+              class="text-xs text-ink-body bg-surface-sub border border-line rounded-full px-2.5 py-1 hover:border-line-strong hover:bg-surface-hover transition-colors"
+              @click="router.push({ name: 'player-profile', params: { id: p.id } })"
             >
               {{ p.name }}<span v-if="p.position" class="text-ink-meta"> · {{ p.position }}</span>
-            </span>
+            </button>
           </div>
           <div v-if="clubsStore.isOwner" class="flex gap-4 pt-3">
             <button class="text-xs text-ink-meta hover:text-ink-secondary transition-colors" @click="startEdit(team.id)">Modifier</button>

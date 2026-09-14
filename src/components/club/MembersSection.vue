@@ -33,7 +33,7 @@ const teamIds = ref<string[]>([])
 const categories = ref<string[]>([])
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
-const activeFilter = ref<'ALL' | 'PLAYER' | 'STAFF' | 'DIRECTION' | 'OTHER' | 'PENDING'>('ALL')
+const activeFilter = ref<'ALL' | 'STAFF' | 'DIRECTION' | 'OTHER' | 'PENDING'>('ALL')
 
 const needsTeams = computed(() => role.value !== 'PRESIDENT' && role.value !== 'CATEGORY_MANAGER')
 const needsCategories = computed(() => role.value === 'CATEGORY_MANAGER')
@@ -89,23 +89,33 @@ function initialsFor(member: ClubMember): string {
   return deriveInitials(member.invitedEmail)
 }
 
-const FILTERS: { id: typeof activeFilter.value; label: string }[] = [
+// Le filtre "Joueurs" a été retiré : un membre de rôle PLAYER n'a quasiment
+// jamais de fiche players liée (ce sont deux tables distinctes — voir
+// players.member_id), donc ce filtre ne remontait structurellement rien et
+// perturbait l'utilisateur qui cherchait ses joueurs dans l'onglet Effectif,
+// là où ils vivent réellement. Un membre de rôle PLAYER reste invitable et
+// visible dans "Tous"/"Autres", juste sans onglet dédié qui prêtait à confusion.
+const FILTERS_BASE: { id: Exclude<typeof activeFilter.value, 'PENDING'>; label: string }[] = [
   { id: 'ALL', label: 'Tous' },
-  { id: 'PLAYER', label: 'Joueurs' },
   { id: 'STAFF', label: 'Encadrement' },
   { id: 'DIRECTION', label: 'Direction' },
   { id: 'OTHER', label: 'Autres' },
-  { id: 'PENDING', label: 'En attente' },
 ]
+
+// "En attente" (invitations non encore acceptées) n'a de sens que pour la
+// personne qui peut agir dessus — réservé au propriétaire du club.
+const FILTERS = computed(() =>
+  clubsStore.isOwner ? [...FILTERS_BASE, { id: 'PENDING' as const, label: 'En attente' }] : FILTERS_BASE,
+)
 
 function matchesFilter(member: ClubMember): boolean {
   switch (activeFilter.value) {
     case 'ALL': return true
-    case 'PLAYER': return member.role === 'PLAYER'
     case 'STAFF': return member.role === 'COACH' || member.role === 'ADJOINT'
     case 'DIRECTION': return member.role === 'OWNER' || member.role === 'PRESIDENT' || member.role === 'CATEGORY_MANAGER'
-    case 'OTHER': return member.role === 'OTHER'
-    case 'PENDING': return member.status === 'PENDING'
+    case 'OTHER': return member.role === 'OTHER' || member.role === 'PLAYER'
+    case 'PENDING': return clubsStore.isOwner && member.status === 'PENDING'
+    default: return true
   }
 }
 

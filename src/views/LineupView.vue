@@ -183,7 +183,7 @@ function handleViewOnly() {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col bg-app text-ink overflow-hidden">
+  <div class="h-dvh flex flex-col bg-app text-ink overflow-hidden">
 
     <!-- Header -->
     <div class="flex-none flex items-center justify-between gap-2.5 px-4 py-3 border-b border-line">

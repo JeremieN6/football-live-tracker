@@ -56,12 +56,8 @@ const routes: RouteRecordRaw[] = [
   // Anciennes URLs, conservées comme redirections pour ne pas casser d'éventuels favoris/liens.
   { path: '/teams', redirect: { name: 'club', query: { tab: 'teams' } } },
   { path: '/roster', redirect: { name: 'club', query: { tab: 'roster' } } },
-  {
-    path: '/members',
-    name: 'members',
-    component: () => import('@/views/MembersView.vue'),
-    meta: { requiresAuth: true },
-  },
+  // La liste des membres vit désormais dans l'onglet "Membres" de /club (MembersSection.vue).
+  { path: '/members', redirect: { name: 'club', query: { tab: 'members' } } },
   {
     path: '/roster/:id',
     name: 'player-profile',

@@ -4,24 +4,28 @@ import { useRouter, useRoute } from 'vue-router'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
+import { useClubMembersStore } from '@/stores/clubMembers.store'
 import TeamsSection from '@/components/club/TeamsSection.vue'
 import RosterSection from '@/components/club/RosterSection.vue'
+import MembersSection from '@/components/club/MembersSection.vue'
 
-type Tab = 'roster' | 'teams'
+type Tab = 'roster' | 'members' | 'teams'
 
 const router = useRouter()
 const route = useRoute()
 const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
 const playersStore = usePlayersStore()
+const membersStore = useClubMembersStore()
 
-const validTab = (value: unknown): value is Tab => value === 'teams' || value === 'roster'
+const validTab = (value: unknown): value is Tab => value === 'teams' || value === 'roster' || value === 'members'
 const activeTab = ref<Tab>(validTab(route.query.tab) ? route.query.tab : 'roster')
 
 onMounted(async () => {
   const club = await clubsStore.ensureClub().catch(() => null)
   await Promise.all([
     club ? teamsStore.fetchTeams(club.id) : Promise.resolve(),
+    club ? membersStore.fetchMembers(club.id) : Promise.resolve(),
     playersStore.fetchPlayers(),
   ])
 })
@@ -35,6 +39,7 @@ const activePlayerCount = computed(() => playersStore.players.filter((p) => p.ac
 
 const tabs = computed(() => [
   { id: 'roster' as const, label: 'Effectif', count: activePlayerCount.value },
+  { id: 'members' as const, label: 'Membres', count: membersStore.members.length },
   { id: 'teams' as const, label: 'Équipes', count: teamsStore.teams.length },
 ])
 </script>
@@ -49,11 +54,11 @@ const tabs = computed(() => [
       </p>
 
       <!-- Onglets -->
-      <div class="flex gap-5 mt-3.5 border-b border-line">
+      <div class="flex gap-5 mt-3.5 border-b border-line overflow-x-auto [scrollbar-width:none]">
         <button
           v-for="tab in tabs"
           :key="tab.id"
-          class="flex items-center gap-1.5 h-[38px] text-sm font-semibold transition-colors"
+          class="flex-none flex items-center gap-1.5 h-[38px] text-sm font-semibold transition-colors whitespace-nowrap"
           :class="activeTab === tab.id ? 'text-ink' : 'text-ink-meta'"
           :style="activeTab === tab.id ? { boxShadow: 'inset 0 -2px 0 #16A34A' } : {}"
           @click="setTab(tab.id)"
@@ -66,6 +71,7 @@ const tabs = computed(() => [
 
     <main class="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-6">
       <RosterSection v-if="activeTab === 'roster'" @go-teams="setTab('teams')" />
+      <MembersSection v-else-if="activeTab === 'members'" />
       <TeamsSection v-else />
     </main>
   </div>

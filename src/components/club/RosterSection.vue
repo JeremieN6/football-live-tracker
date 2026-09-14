@@ -5,7 +5,8 @@ import { Search, Plus, X } from 'lucide-vue-next'
 import { usePlayersStore } from '@/stores/players.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
-import { deriveInitials } from '@/lib/displayName'
+import { useClubMembersStore } from '@/stores/clubMembers.store'
+import { deriveInitials, deriveDisplayName } from '@/lib/displayName'
 import { extractErrorMessage } from '@/lib/errors'
 
 const emit = defineEmits<{ 'go-teams': [] }>()
@@ -14,12 +15,14 @@ const router = useRouter()
 const playersStore = usePlayersStore()
 const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
+const membersStore = useClubMembersStore()
 
 const name = ref('')
 // Certains navigateurs renvoient une valeur numérique (et non une chaîne) via v-model sur un input type="number"
 const number = ref<string | number>('')
 const position = ref('')
 const teamId = ref<string | null>(null)
+const memberId = ref<string | null>(null)
 const editingId = ref<string | null>(null)
 const showForm = ref(false)
 const showArchived = ref(false)
@@ -32,11 +35,26 @@ const errorMessage = ref<string | null>(null)
 onMounted(async () => {
   try {
     const club = await clubsStore.ensureClub()
-    await Promise.all([playersStore.fetchPlayers(), teamsStore.fetchTeams(club.id)])
+    await Promise.all([playersStore.fetchPlayers(), teamsStore.fetchTeams(club.id), membersStore.fetchMembers(club.id)])
   } catch (err: unknown) {
     errorMessage.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
   }
 })
+
+// Comptes membres pas déjà liés à une autre fiche joueur (+ celui actuellement
+// lié au joueur en cours d'édition, pour ne pas le faire disparaître de la liste)
+const availableMembers = computed(() => {
+  const linkedElsewhere = new Set(
+    playersStore.players.filter((p) => p.memberId && p.id !== editingId.value).map((p) => p.memberId),
+  )
+  return membersStore.members.filter((m) => !linkedElsewhere.has(m.id))
+})
+
+function memberLabel(id: string): string {
+  const member = membersStore.members.find((m) => m.id === id)
+  if (!member) return 'Compte inconnu'
+  return member.invitedEmail ? deriveDisplayName(member.invitedEmail) : 'Vous'
+}
 
 // Un coach non-propriétaire ne peut rattacher un joueur qu'à ses équipes
 // rattachées (ou celles de sa catégorie pour un Responsable de catégorie)
@@ -91,6 +109,7 @@ function startEdit(id: string) {
   number.value = player.number != null ? String(player.number) : ''
   position.value = player.position ?? ''
   teamId.value = player.teamId
+  memberId.value = player.memberId
   showForm.value = true
 }
 
@@ -100,6 +119,7 @@ function resetForm() {
   number.value = ''
   position.value = ''
   teamId.value = null
+  memberId.value = null
   errorMessage.value = null
   showForm.value = false
 }
@@ -116,6 +136,7 @@ async function handleSubmit() {
         number: numberStr ? Number(numberStr) : null,
         position: position.value.trim() || null,
         teamId: teamId.value,
+        memberId: memberId.value,
       })
     } else {
       await playersStore.createPlayer({
@@ -124,6 +145,7 @@ async function handleSubmit() {
         position: position.value.trim() || null,
         clubId: clubsStore.club.id,
         teamId: teamId.value,
+        memberId: memberId.value,
       })
     }
     resetForm()
@@ -311,6 +333,20 @@ async function toggleActive(id: string, active: boolean) {
             <p v-if="teamsStore.teams.length === 0" class="text-xs text-ink-meta">
               Aucune équipe créée pour le moment —
               <button type="button" class="underline hover:text-ink" @click="emit('go-teams')">en créer une</button>
+            </p>
+          </div>
+          <div class="space-y-1">
+            <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Compte lié (optionnel)</label>
+            <select
+              v-model="memberId"
+              class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink
+                     text-sm outline-none focus:border-brand transition-colors [color-scheme:dark]"
+            >
+              <option :value="null">Aucun</option>
+              <option v-for="m in availableMembers" :key="m.id" :value="m.id">{{ memberLabel(m.id) }}</option>
+            </select>
+            <p class="text-xs text-ink-meta">
+              Si ce joueur a aussi un compte sur l'app (ex. il a été invité comme JOUEUR), relie sa fiche pour afficher son numéro/poste sur sa carte membre.
             </p>
           </div>
 

@@ -14,6 +14,7 @@ function rowToPlayer(row: Record<string, unknown>): Player {
     active: row.active as boolean,
     clubId: row.club_id as string | null,
     teamId: row.team_id as string | null,
+    memberId: (row.member_id as string | null) ?? null,
     createdBy: row.created_by as string,
     createdAt: row.created_at as string,
   }
@@ -50,6 +51,7 @@ export const usePlayersStore = defineStore('players', () => {
     position: string | null
     clubId: string
     teamId: string | null
+    memberId?: string | null
   }): Promise<Player> {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) throw new Error('Non authentifié.')
@@ -62,6 +64,7 @@ export const usePlayersStore = defineStore('players', () => {
         position: payload.position,
         club_id: payload.clubId,
         team_id: payload.teamId,
+        member_id: payload.memberId ?? null,
         created_by: userData.user.id,
       })
       .select()
@@ -74,20 +77,26 @@ export const usePlayersStore = defineStore('players', () => {
     return player
   }
 
-  // Modifie un joueur (nom, numéro, poste, équipe)
+  // Modifie un joueur (nom, numéro, poste, équipe, compte lié)
   async function updatePlayer(
     id: string,
-    payload: { name: string; number: number | null; position: string | null; teamId: string | null },
+    payload: { name: string; number: number | null; position: string | null; teamId: string | null; memberId?: string | null },
   ) {
     const { error: sbError } = await supabase
       .from('players')
-      .update({ name: payload.name, number: payload.number, position: payload.position, team_id: payload.teamId })
+      .update({
+        name: payload.name,
+        number: payload.number,
+        position: payload.position,
+        team_id: payload.teamId,
+        member_id: payload.memberId ?? null,
+      })
       .eq('id', id)
 
     if (sbError) throw sbError
 
     const idx = players.value.findIndex((p) => p.id === id)
-    if (idx !== -1) players.value[idx] = { ...players.value[idx], ...payload }
+    if (idx !== -1) players.value[idx] = { ...players.value[idx], ...payload, memberId: payload.memberId ?? null }
   }
 
   // Archive / réactive un joueur (ne le supprime pas : il reste attaché à l'historique des matchs)

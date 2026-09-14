@@ -170,7 +170,7 @@ const clubMeta = computed(() => {
         >
           <button
             class="w-full h-11 px-3 flex items-center gap-2.5 text-sm text-ink-body hover:bg-surface-hover transition-colors text-left"
-            @click="showMenu = false; router.push({ name: 'members' })"
+            @click="showMenu = false; router.push({ name: 'club', query: { tab: 'members' } })"
           >
             <Users :size="16" :stroke-width="2" class="text-ink-meta" /> Membres
           </button>

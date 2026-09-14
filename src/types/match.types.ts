@@ -67,6 +67,8 @@ export interface Player {
   // Équipe du club à laquelle le joueur est actuellement rattaché
   clubId: string | null
   teamId: string | null
+  // Compte membre lié (club_members.id), pour un joueur qui a aussi un accès à l'app — optionnel
+  memberId: string | null
   createdBy: string
   createdAt: string
 }

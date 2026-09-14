@@ -13,6 +13,7 @@ import { ROLE_BADGES } from '@/lib/roleBadge'
 import { OUTCOME_BADGES, outcomeFor } from '@/lib/matchBadges'
 import NrvLogo from '@/components/NrvLogo.vue'
 import RoleBadge from '@/components/RoleBadge.vue'
+import ClubCrest from '@/components/ClubCrest.vue'
 import CreateMatchModal from '@/components/tracker/CreateMatchModal.vue'
 import type { Match } from '@/types/match.types'
 
@@ -129,8 +130,6 @@ function teamRosterCount(teamId: string): number {
   return activePlayers.value.filter((p) => p.teamId === teamId).length
 }
 
-const clubInitials = computed(() => deriveInitials(clubsStore.club?.name?.replace(/\s+/, '.') ?? null))
-
 const membershipBadge = computed(() =>
   clubsStore.membership ? ROLE_BADGES[clubsStore.membership.role] : null,
 )
@@ -208,12 +207,7 @@ const clubMeta = computed(() => {
 
       <!-- Identité club -->
       <div class="flex-shrink-0 flex items-center gap-3.5 p-4 bg-surface border border-line rounded-card">
-        <div
-          class="flex-none w-[58px] h-[65px] rounded-[10px] flex items-center justify-center border-2"
-          style="background: #0d2810; border-color: #16A34A"
-        >
-          <span class="font-score text-lg font-bold text-ink">{{ clubInitials }}</span>
-        </div>
+        <ClubCrest :logo-url="clubsStore.club?.logoUrl" :name="clubsStore.club?.name" />
         <div class="flex-1 min-w-0">
           <p class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Ton club</p>
           <h1 class="mt-[5px] text-[18px] font-semibold text-ink truncate">{{ clubsStore.club?.name ?? 'Ton club' }}</h1>

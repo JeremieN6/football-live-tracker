@@ -7,6 +7,7 @@ import { useEventsStore } from '@/stores/events.store'
 import { useReportStore } from '@/stores/report.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useLineupStore } from '@/stores/lineup.store'
+import { eventMeta } from '@/lib/eventPalette'
 import type { ReportStats } from '@/stores/report.store'
 import type { MatchEvent } from '@/types/match.types'
 
@@ -258,8 +259,8 @@ function exportPdf() {
           </button>
         </div>
 
-        <!-- Sections du rapport -->
-        <template v-else>
+        <!-- Sections du rapport (IA, seulement si généré) -->
+        <template v-if="sections.length > 0">
           <div v-for="(s, i) in sections" :key="s.num">
             <div
               :class="s.tone === 'bad'
@@ -291,36 +292,48 @@ function exportPdf() {
           <button class="block mx-auto mt-1 text-xs text-ink-meta hover:text-ink-secondary transition-colors" @click="handleGenerate">
             Réanalyser
           </button>
+        </template>
 
-          <!-- Chronologie (donnée factuelle, pas de l'IA — gardée hors des sections numérotées) -->
-          <div v-if="chronology.length > 0" class="mt-5 pt-4 border-t border-line">
-            <h2 class="text-[13px] font-semibold text-ink mb-3">Chronologie</h2>
-            <div class="bg-surface border border-line rounded-card divide-y divide-line">
-              <div v-for="event in chronology" :key="event.id" class="flex items-center gap-2.5 px-3 py-2">
-                <span class="font-score text-xs font-bold text-ink-meta w-7 shrink-0">{{ event.minute }}'</span>
-                <span class="text-sm text-ink-body">{{ chronologyLabel(event) }}</span>
-              </div>
+        <!-- Chronologie (donnée factuelle, pas de l'IA — indépendante du rapport IA, -->
+        <!-- affichée dès qu'il y a des événements même si aucun rapport n'a été généré) -->
+        <div v-if="chronology.length > 0" class="mt-5 pt-4 border-t border-line">
+          <h2 class="text-[13px] font-semibold text-ink mb-3">Chronologie</h2>
+          <div class="bg-surface border border-line rounded-card divide-y divide-line">
+            <div
+              v-for="event in chronology"
+              :key="event.id"
+              class="flex items-center gap-2.5 px-3 py-2.5 odd:bg-surface-sub"
+            >
+              <component
+                :is="eventMeta(event.type).icon"
+                :size="15"
+                :stroke-width="2"
+                class="flex-none"
+                :style="{ color: eventMeta(event.type).color }"
+              />
+              <span class="font-score text-xs font-bold text-ink-meta w-7 shrink-0">{{ event.minute }}'</span>
+              <span class="text-sm text-ink-body">{{ chronologyLabel(event) }}</span>
             </div>
           </div>
+        </div>
 
-          <div class="flex flex-col gap-2 mt-5">
-            <button
-              class="h-12 rounded-btn border border-line bg-surface text-ink text-sm font-medium hover:bg-surface-hover transition-colors"
-              @click="exportPdf"
-            >
-              Exporter en PDF
-            </button>
-            <button
-              class="h-12 rounded-btn border border-line bg-transparent text-ink-secondary text-sm font-medium hover:text-ink hover:bg-surface transition-colors"
-              @click="openTimeline"
-            >
-              Revoir la timeline
-            </button>
-          </div>
-          <p class="mt-4 text-center text-[11px] text-ink-disabled leading-[1.6]">
-            Analyse produite à partir des {{ stats?.totalEvents ?? 0 }} événements saisis — relis-la avant de la partager.
-          </p>
-        </template>
+        <div v-if="reportStore.report" class="flex flex-col gap-2 mt-5">
+          <button
+            class="h-12 rounded-btn border border-line bg-surface text-ink text-sm font-medium hover:bg-surface-hover transition-colors"
+            @click="exportPdf"
+          >
+            Exporter en PDF
+          </button>
+          <button
+            class="h-12 rounded-btn border border-line bg-transparent text-ink-secondary text-sm font-medium hover:text-ink hover:bg-surface transition-colors"
+            @click="openTimeline"
+          >
+            Revoir la timeline
+          </button>
+        </div>
+        <p v-if="reportStore.report" class="mt-4 text-center text-[11px] text-ink-disabled leading-[1.6]">
+          Analyse produite à partir des {{ stats?.totalEvents ?? 0 }} événements saisis — relis-la avant de la partager.
+        </p>
       </div>
     </div>
   </div>

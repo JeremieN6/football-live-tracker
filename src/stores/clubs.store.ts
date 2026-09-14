@@ -12,6 +12,7 @@ export function rowToClub(row: Record<string, unknown>): Club {
     status: row.status as Club['status'],
     foundedYear: (row.founded_year as number | null) ?? null,
     location: (row.location as string | null) ?? null,
+    logoUrl: (row.logo_url as string | null) ?? null,
     createdAt: row.created_at as string,
   }
 }
@@ -202,16 +203,31 @@ export const useClubsStore = defineStore('clubs', () => {
 
   // Met à jour l'identité du club (nom, année de fondation, localisation) — réservé
   // au propriétaire côté UI (RLS `clubs_update_own` l'impose de toute façon en base).
-  async function updateClubInfo(payload: { name: string; foundedYear: number | null; location: string | null }) {
+  async function updateClubInfo(payload: { name: string; foundedYear: number | null; location: string | null; logoUrl?: string | null }) {
     if (!club.value) return
+    const update: Record<string, unknown> = { name: payload.name, founded_year: payload.foundedYear, location: payload.location }
+    if (payload.logoUrl !== undefined) update.logo_url = payload.logoUrl
     const { error: sbError } = await supabase
       .from('clubs')
-      .update({ name: payload.name, founded_year: payload.foundedYear, location: payload.location })
+      .update(update)
       .eq('id', club.value.id)
     if (sbError) throw sbError
     club.value.name = payload.name
     club.value.foundedYear = payload.foundedYear
     club.value.location = payload.location
+    if (payload.logoUrl !== undefined) club.value.logoUrl = payload.logoUrl
+  }
+
+  // Upload d'un fichier logo (drag-and-drop) vers le bucket public "club-logos",
+  // rangé sous "<club_id>/logo.<ext>" (upsert : remplace l'ancien logo du club).
+  async function uploadLogo(file: File): Promise<string> {
+    if (!club.value) throw new Error('Aucun club.')
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
+    const path = `${club.value.id}/logo.${ext}`
+    const { error: uploadError } = await supabase.storage.from('club-logos').upload(path, file, { upsert: true })
+    if (uploadError) throw uploadError
+    const { data } = supabase.storage.from('club-logos').getPublicUrl(path)
+    return `${data.publicUrl}?t=${Date.now()}`
   }
 
   function reset() {
@@ -220,5 +236,5 @@ export const useClubsStore = defineStore('clubs', () => {
     error.value = null
   }
 
-  return { club, membership, isOwner, canWrite, hasTeamAccess, loading, error, ensureClub, createClub, updateClubInfo, reset }
+  return { club, membership, isOwner, canWrite, hasTeamAccess, loading, error, ensureClub, createClub, updateClubInfo, uploadLogo, reset }
 })

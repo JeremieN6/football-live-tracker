@@ -82,6 +82,7 @@ export interface Club {
   status: ClubStatus
   foundedYear: number | null
   location: string | null
+  logoUrl: string | null
   createdAt: string
 }
 

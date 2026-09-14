@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
+import { ArrowLeft, Upload } from 'lucide-vue-next'
 import { useClubsStore } from '@/stores/clubs.store'
 import { extractErrorMessage } from '@/lib/errors'
+import ClubCrest from '@/components/ClubCrest.vue'
 
 const router = useRouter()
 const clubsStore = useClubsStore()
@@ -11,8 +12,11 @@ const clubsStore = useClubsStore()
 const name = ref('')
 const foundedYear = ref('')
 const location = ref('')
+const logoUrl = ref('')
 const loading = ref(true)
 const saving = ref(false)
+const uploadingLogo = ref(false)
+const dragOver = ref(false)
 const errorMessage = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 
@@ -26,12 +30,49 @@ onMounted(async () => {
     name.value = club.name
     foundedYear.value = club.foundedYear ? String(club.foundedYear) : ''
     location.value = club.location ?? ''
+    logoUrl.value = club.logoUrl ?? ''
   } catch (err: unknown) {
     errorMessage.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
   } finally {
     loading.value = false
   }
 })
+
+async function handleFile(file: File | undefined | null) {
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    errorMessage.value = 'Le logo doit être une image (PNG, JPG, SVG...).'
+    return
+  }
+  errorMessage.value = null
+  uploadingLogo.value = true
+  try {
+    const url = await clubsStore.uploadLogo(file)
+    logoUrl.value = url
+    await clubsStore.updateClubInfo({
+      name: name.value.trim() || clubsStore.club!.name,
+      foundedYear: clubsStore.club!.foundedYear,
+      location: clubsStore.club!.location,
+      logoUrl: url,
+    })
+    successMessage.value = 'Logo mis à jour.'
+  } catch (err: unknown) {
+    errorMessage.value = extractErrorMessage(err, "Erreur lors de l'envoi du logo.")
+  } finally {
+    uploadingLogo.value = false
+  }
+}
+
+function onDrop(event: DragEvent) {
+  dragOver.value = false
+  handleFile(event.dataTransfer?.files?.[0])
+}
+
+function onFileInput(event: Event) {
+  const input = event.target as HTMLInputElement
+  handleFile(input.files?.[0])
+  input.value = ''
+}
 
 async function handleSubmit() {
   errorMessage.value = null
@@ -40,7 +81,7 @@ async function handleSubmit() {
     errorMessage.value = 'Le nom du club est requis.'
     return
   }
-  const yearTrimmed = foundedYear.value.trim()
+  const yearTrimmed = String(foundedYear.value).trim()
   const yearValue = yearTrimmed ? Number(yearTrimmed) : null
   if (yearTrimmed && (!Number.isInteger(yearValue) || yearValue! < 1850 || yearValue! > 2100)) {
     errorMessage.value = 'Année de fondation invalide.'
@@ -53,6 +94,7 @@ async function handleSubmit() {
       name: name.value.trim(),
       foundedYear: yearValue,
       location: location.value.trim() || null,
+      logoUrl: logoUrl.value.trim() || null,
     })
     successMessage.value = 'Informations enregistrées.'
   } catch (err: unknown) {
@@ -82,6 +124,30 @@ async function handleSubmit() {
       </p>
 
       <form v-else class="flex flex-col gap-3.5 mt-2" @submit.prevent="handleSubmit">
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Logo du club</label>
+          <div class="flex items-center gap-3">
+            <ClubCrest :logo-url="logoUrl || null" :name="name" />
+            <label
+              class="flex-1 flex flex-col items-center justify-center gap-1 h-[65px] rounded-input border border-dashed text-center cursor-pointer transition-colors"
+              :class="dragOver ? 'border-brand bg-brand-soft' : 'border-line text-ink-meta hover:border-line-strong'"
+              @dragover.prevent="dragOver = true"
+              @dragleave.prevent="dragOver = false"
+              @drop.prevent="onDrop"
+            >
+              <Upload :size="16" :stroke-width="2" />
+              <span class="text-[11px]">{{ uploadingLogo ? 'Envoi…' : 'Glisser une image ou cliquer' }}</span>
+              <input type="file" accept="image/*" class="hidden" :disabled="uploadingLogo" @change="onFileInput" />
+            </label>
+          </div>
+          <input
+            v-model="logoUrl"
+            type="url"
+            placeholder="Ou coller une URL d'image (.png, .jpg, .svg...)"
+            class="h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta text-sm outline-none focus:border-brand transition-colors"
+          />
+        </div>
 
         <div class="flex flex-col gap-1.5">
           <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary" for="club-name">Nom du club</label>

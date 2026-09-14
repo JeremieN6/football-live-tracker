@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { ArrowLeft } from 'lucide-vue-next'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useClubMembersStore } from '@/stores/clubMembers.store'
+import ClubCrest from '@/components/ClubCrest.vue'
 import TeamsSection from '@/components/club/TeamsSection.vue'
 import RosterSection from '@/components/club/RosterSection.vue'
 import MembersSection from '@/components/club/MembersSection.vue'
@@ -48,7 +50,13 @@ const tabs = computed(() => [
   <div class="min-h-screen bg-app flex flex-col text-ink">
 
     <div class="flex-none px-4 pt-3.5">
-      <h1 class="text-[20px] font-semibold text-ink">{{ clubsStore.club?.name ?? 'Ton club' }}</h1>
+      <div class="flex items-center gap-2 -ml-1">
+        <button class="p-1 text-ink-meta hover:text-ink transition-colors" @click="router.push({ name: 'home' })">
+          <ArrowLeft :size="18" :stroke-width="2" />
+        </button>
+        <ClubCrest :logo-url="clubsStore.club?.logoUrl" :name="clubsStore.club?.name" size="sm" />
+        <h1 class="text-[20px] font-semibold text-ink">{{ clubsStore.club?.name ?? 'Ton club' }}</h1>
+      </div>
       <p class="mt-1 text-[11px] text-ink-meta">
         {{ teamsStore.teams.length }} équipe{{ teamsStore.teams.length > 1 ? 's' : '' }} · {{ activePlayerCount }} joueur{{ activePlayerCount > 1 ? 's' : '' }}
       </p>

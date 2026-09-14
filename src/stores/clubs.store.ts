@@ -17,9 +17,12 @@ export function rowToClub(row: Record<string, unknown>): Club {
   }
 }
 
-export type MemberRole = 'OWNER' | 'COACH' | 'PLAYER' | 'OTHER' | 'PRESIDENT' | 'CATEGORY_MANAGER' | 'ADJOINT'
+export type MemberRole = 'OWNER' | 'COACH' | 'PLAYER' | 'OTHER' | 'PRESIDENT' | 'CATEGORY_MANAGER' | 'ADJOINT' | 'DIRIGEANT'
 
 export interface Membership {
+  // Identifiant de la ligne club_members du membre courant — sert à comparer
+  // avec matches.designated_tracker_member_id (délégation de tracking).
+  id: string | null
   role: MemberRole
   teamIds: string[]
   // Catégories rattachées (Responsable de catégorie uniquement) : accès
@@ -94,7 +97,13 @@ export const useClubsStore = defineStore('clubs', () => {
 
       if (existing) {
         club.value = rowToClub(existing)
-        membership.value = { role: 'OWNER', teamIds: [], categories: [] }
+        const { data: ownMemberRow } = await supabase
+          .from('club_members')
+          .select('id')
+          .eq('club_id', existing.id)
+          .eq('user_id', userData.user.id)
+          .maybeSingle()
+        membership.value = { id: ownMemberRow?.id ?? null, role: 'OWNER', teamIds: [], categories: [] }
         // Auto-réparation : un club sans aucune équipe (ex. suite à une migration ou un aléa)
         // ne doit pas rester bloqué sans équipe par défaut.
         const { count: teamCount, error: countError } = await supabase
@@ -143,6 +152,7 @@ export const useClubsStore = defineStore('clubs', () => {
 
         club.value = rowToClub(memberClub)
         membership.value = {
+          id: memberRow.id,
           role: memberRow.role as Membership['role'],
           teamIds: (teamLinks ?? []).map((row) => row.team_id as string),
           categories: (categoryLinks ?? []).map((row) => row.category as string),
@@ -190,8 +200,16 @@ export const useClubsStore = defineStore('clubs', () => {
         .insert({ club_id: newClub.id, user_id: userData.user.id, role: 'OWNER', status: 'ACTIVE' })
       if (memberError) throw memberError
 
+      const { data: newMember, error: newMemberFetchError } = await supabase
+        .from('club_members')
+        .select('id')
+        .eq('club_id', newClub.id)
+        .eq('user_id', userData.user.id)
+        .single()
+      if (newMemberFetchError) throw newMemberFetchError
+
       club.value = rowToClub(newClub)
-      membership.value = { role: 'OWNER', teamIds: [], categories: [] }
+      membership.value = { id: newMember.id, role: 'OWNER', teamIds: [], categories: [] }
       return club.value
     } catch (err: unknown) {
       error.value = extractErrorMessage(err, 'Erreur lors de la création du club.')

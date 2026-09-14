@@ -20,6 +20,7 @@ function rowToMatch(row: Record<string, unknown>): Match {
     clubId: row.club_id as string | null,
     teamId: row.team_id as string | null,
     formation: (row.formation as string | null) ?? null,
+    designatedTrackerMemberId: (row.designated_tracker_member_id as string | null) ?? null,
     createdBy: row.created_by as string,
   }
 }
@@ -79,6 +80,7 @@ export const useMatchStore = defineStore('match', () => {
     date: string
     clubId: string
     teamId: string | null
+    designatedTrackerMemberId?: string | null
   }): Promise<Match> {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) throw new Error('Non authentifié.')
@@ -92,6 +94,7 @@ export const useMatchStore = defineStore('match', () => {
         date: payload.date,
         club_id: payload.clubId,
         team_id: payload.teamId,
+        designated_tracker_member_id: payload.designatedTrackerMemberId ?? null,
         created_by: userData.user.id,
       })
       .select()

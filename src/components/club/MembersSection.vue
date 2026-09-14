@@ -23,6 +23,7 @@ const roleOptions: { value: InvitableRole; label: string; hint: string }[] = [
   { value: 'PLAYER', label: 'Joueur', hint: 'Lecture seule sur ses équipes' },
   { value: 'OTHER', label: 'Autre', hint: 'Staff, lecture seule sur ses équipes' },
   { value: 'PRESIDENT', label: 'Président', hint: 'Lecture seule sur tout le club, aucune équipe à choisir' },
+  { value: 'DIRIGEANT', label: 'Dirigeant', hint: 'Lecture seule sur tout le club, ne peut pas inviter de membre' },
   { value: 'CATEGORY_MANAGER', label: 'Responsable de catégorie', hint: 'Accès complet à toutes les équipes d\'une ou plusieurs catégories, y compris futures' },
 ]
 
@@ -35,7 +36,7 @@ const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 const activeFilter = ref<'ALL' | 'STAFF' | 'DIRECTION' | 'OTHER' | 'PENDING'>('ALL')
 
-const needsTeams = computed(() => role.value !== 'PRESIDENT' && role.value !== 'CATEGORY_MANAGER')
+const needsTeams = computed(() => role.value !== 'PRESIDENT' && role.value !== 'DIRIGEANT' && role.value !== 'CATEGORY_MANAGER')
 const needsCategories = computed(() => role.value === 'CATEGORY_MANAGER')
 const singleTeamRole = computed(() => role.value === 'PLAYER' || role.value === 'OTHER')
 
@@ -112,7 +113,7 @@ function matchesFilter(member: ClubMember): boolean {
   switch (activeFilter.value) {
     case 'ALL': return true
     case 'STAFF': return member.role === 'COACH' || member.role === 'ADJOINT'
-    case 'DIRECTION': return member.role === 'OWNER' || member.role === 'PRESIDENT' || member.role === 'CATEGORY_MANAGER'
+    case 'DIRECTION': return member.role === 'OWNER' || member.role === 'PRESIDENT' || member.role === 'DIRIGEANT' || member.role === 'CATEGORY_MANAGER'
     case 'OTHER': return member.role === 'OTHER' || member.role === 'PLAYER'
     case 'PENDING': return clubsStore.isOwner && member.status === 'PENDING'
     default: return true
@@ -300,8 +301,8 @@ async function handleInvite() {
               </label>
             </div>
           </div>
-          <p v-if="role === 'PRESIDENT'" class="text-xs text-ink-meta">
-            Le président a accès en lecture à tout le club, aucune équipe à sélectionner.
+          <p v-if="role === 'PRESIDENT' || role === 'DIRIGEANT'" class="text-xs text-ink-meta">
+            {{ role === 'PRESIDENT' ? 'Le président' : 'Le dirigeant' }} a accès en lecture à tout le club, aucune équipe à sélectionner.
           </p>
 
           <p v-if="errorMessage" class="text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2">

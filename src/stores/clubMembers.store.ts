@@ -86,9 +86,9 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
 
   // Invite un membre par email avec un rôle, sur une ou plusieurs équipes
   // (COACH/PLAYER/OTHER/ADJOINT) ou catégories (CATEGORY_MANAGER, accès
-  // automatique à toute équipe de cette catégorie) -- le PRESIDENT n'a
-  // besoin ni de l'un ni de l'autre (accès club-wide en lecture). Status
-  // PENDING tant que la personne invitée n'a pas de compte lié.
+  // automatique à toute équipe de cette catégorie) -- ni le PRESIDENT ni le
+  // DIRIGEANT n'ont besoin de l'un ou de l'autre (accès club-wide en
+  // lecture). Status PENDING tant que la personne invitée n'a pas de compte lié.
   async function inviteMember(
     clubId: string,
     payload: { email: string; role: Exclude<MemberRole, 'OWNER'>; teamIds: string[]; categories: string[] },
@@ -97,7 +97,7 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
     if (!userData.user) throw new Error('Non authentifié.')
     if (payload.role === 'CATEGORY_MANAGER') {
       if (payload.categories.length === 0) throw new Error('Sélectionnez au moins une catégorie.')
-    } else if (payload.role !== 'PRESIDENT' && payload.teamIds.length === 0) {
+    } else if (payload.role !== 'PRESIDENT' && payload.role !== 'DIRIGEANT' && payload.teamIds.length === 0) {
       throw new Error('Sélectionnez au moins une équipe.')
     }
 

@@ -33,6 +33,7 @@ function rowToMatch(row: Record<string, unknown>): Match {
     clubId: row.club_id as string | null,
     teamId: row.team_id as string | null,
     formation: (row.formation as string | null) ?? null,
+    designatedTrackerMemberId: (row.designated_tracker_member_id as string | null) ?? null,
     createdBy: row.created_by as string,
   }
 }

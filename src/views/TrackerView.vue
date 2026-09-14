@@ -75,6 +75,17 @@ const teamMeta = computed(() => {
   return [name, match.competition].filter(Boolean).join(' · ')
 })
 
+// Un coach/adjoint/etc. peut toujours tracker ; en plus, un membre désigné
+// par le coach pour CE match précis (matches.designated_tracker_member_id,
+// cf. CreateMatchModal) peut aussi saisir les événements — sans avoir les
+// droits COACH sur toute l'équipe. Écriture directe, revue par le coach a
+// posteriori (pas de file de validation séparée).
+const canTrack = computed(() => {
+  if (clubsStore.canWrite) return true
+  const trackerId = matchStore.currentMatch?.designatedTrackerMemberId
+  return !!trackerId && trackerId === clubsStore.membership?.id
+})
+
 onMounted(async () => {
   eventsStore.reset()
   await Promise.all([
@@ -84,8 +95,8 @@ onMounted(async () => {
     lineupStore.fetchLineup(matchId),
   ])
   if (clubsStore.club) await teamsStore.fetchTeams(clubsStore.club.id)
-  // Passe le match en LIVE si PENDING (uniquement si on a le droit d'écrire sur ce match)
-  if (clubsStore.canWrite && matchStore.currentMatch?.status === 'PENDING') {
+  // Passe le match en LIVE si PENDING (uniquement si on a le droit de tracker ce match)
+  if (canTrack.value && matchStore.currentMatch?.status === 'PENDING') {
     await matchStore.updateMatchStatus(matchId, 'LIVE')
   }
   // Démarrer la synchronisation Realtime
@@ -246,7 +257,7 @@ async function handleFinishMatch() {
         :home-team="matchStore.currentMatch?.homeTeam ?? ''"
         :away-team="matchStore.currentMatch?.awayTeam ?? ''"
         :meta="teamMeta"
-        :can-control="clubsStore.canWrite"
+        :can-control="canTrack"
         :added-time-display="timer.addedTimeDisplay.value"
         @start="timer.start()"
         @pause="timer.pause()"
@@ -257,14 +268,14 @@ async function handleFinishMatch() {
       <!-- Zone 2 — terrain (fixe, 300px) -->
       <PitchMap
         :events="eventsStore.events"
-        :active-action="clubsStore.canWrite ? selectedAction : null"
-        :hint="clubsStore.canWrite ? pitchHint : ''"
+        :active-action="canTrack ? selectedAction : null"
+        :hint="canTrack ? pitchHint : ''"
         @pitch-click="handlePitchClick"
       />
 
       <!-- Zone 3 — palette d'événements (fixe) -->
       <ActionButtons
-        v-if="clubsStore.canWrite"
+        v-if="canTrack"
         :selected-action="selectedAction"
         @select="handleActionSelect"
         @deselect="handleActionDeselect"
@@ -288,13 +299,13 @@ async function handleFinishMatch() {
         <EventLog
           :events="eventsStore.events"
           :players="lineupPlayers"
-          :read-only="!clubsStore.canWrite"
+          :read-only="!canTrack"
           @delete="handleDeleteEvent"
         />
 
         <!-- Bouton terminer le match -->
         <button
-          v-if="clubsStore.canWrite"
+          v-if="canTrack"
           class="w-full h-12 mt-4 rounded-btn border border-line text-ink-secondary text-sm font-medium
                  hover:border-danger-line hover:text-danger hover:bg-danger-soft transition-colors"
           @click="showFinishConfirm = true"

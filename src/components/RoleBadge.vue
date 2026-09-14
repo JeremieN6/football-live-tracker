@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Crown, ClipboardList, UserCheck, Landmark, Layers, Footprints, User } from 'lucide-vue-next'
+import { Crown, ClipboardList, UserCheck, Landmark, Layers, Footprints, User, Briefcase } from 'lucide-vue-next'
 import { ROLE_BADGES } from '@/lib/roleBadge'
 import type { MemberRole } from '@/stores/clubs.store'
 
@@ -16,6 +16,7 @@ const ICONS = {
   layers: Layers,
   footprints: Footprints,
   user: User,
+  briefcase: Briefcase,
 } as const
 
 const icon = computed(() => ICONS[style.value.icon])

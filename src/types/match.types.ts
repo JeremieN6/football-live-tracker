@@ -132,6 +132,9 @@ export interface Match {
   teamId: string | null
   // Formation choisie pour la composition (ex. "4-4-2") — null tant qu'aucune n'a été enregistrée
   formation: string | null
+  // Membre (généralement un joueur) désigné par le coach pour tracker CE match
+  // précis, sans lui donner les droits d'écriture COACH/ADJOINT sur l'équipe.
+  designatedTrackerMemberId: string | null
   createdBy: string
 }
 

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { Search, Plus, X } from 'lucide-vue-next'
 import { usePlayersStore } from '@/stores/players.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
+import { deriveInitials } from '@/lib/displayName'
 import { extractErrorMessage } from '@/lib/errors'
 
 const emit = defineEmits<{ 'go-teams': [] }>()
@@ -43,7 +45,6 @@ const selectableTeams = computed(() => {
   return teamsStore.teams.filter((t) => clubsStore.hasTeamAccess(t))
 })
 
-// Postes existants dans l'effectif, pour peupler le filtre
 const positions = computed(() => {
   const set = new Set(playersStore.players.map((p) => p.position).filter((p): p is string => !!p))
   return [...set].sort((a, b) => a.localeCompare(b))
@@ -55,7 +56,6 @@ const visiblePlayers = computed(() => {
   if (filterPosition.value !== 'ALL') list = list.filter((p) => p.position === filterPosition.value)
   const query = searchQuery.value.trim().toLowerCase()
   if (query) list = list.filter((p) => p.name.toLowerCase().includes(query))
-  // Trie par équipe (ordre de création des équipes), puis par numéro
   const teamOrder = new Map(teamsStore.teams.map((t, i) => [t.id, i]))
   return [...list].sort((a, b) => {
     const orderA = a.teamId ? (teamOrder.get(a.teamId) ?? 999) : 998
@@ -68,6 +68,19 @@ const visiblePlayers = computed(() => {
 function teamName(id: string | null): string {
   if (!id) return 'Sans équipe'
   return teamsStore.teams.find((t) => t.id === id)?.name ?? 'Équipe inconnue'
+}
+
+// Palette decorative cyclique pour l'avatar (les joueurs n'ont pas de "role"
+// comme les membres du club — juste un poste en texte libre).
+const AVATAR_PALETTE = [
+  { bg: '#451a03', border: '#78716c', fg: '#FBBF24' },
+  { bg: '#172554', border: '#1e40af', fg: '#60A5FA' },
+  { bg: '#052e16', border: '#166534', fg: '#4ADE80' },
+  { bg: '#450a0a', border: '#7f1d1d', fg: '#F87171' },
+  { bg: '#1e1033', border: '#7c3aed', fg: '#a78bfa' },
+]
+function avatarStyle(index: number) {
+  return AVATAR_PALETTE[index % AVATAR_PALETTE.length]
 }
 
 function startEdit(id: string) {
@@ -128,116 +141,108 @@ async function toggleActive(id: string, active: boolean) {
 
 <template>
   <div>
-    <!-- Bouton d'ouverture du formulaire -->
-    <button
-      v-if="clubsStore.canWrite"
-      class="w-full h-11 mb-6 rounded-xl border border-dashed border-white/15 text-neutral-400 text-sm font-medium
-             hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2"
-      @click="showForm = true"
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-        <path d="M12 5v14M5 12h14" />
-      </svg>
-      Ajouter un joueur
-    </button>
-
     <!-- Recherche -->
-    <div class="relative mb-3">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-        <circle cx="11" cy="11" r="7" />
-        <path d="m21 21-4.3-4.3" />
-      </svg>
+    <div class="relative mb-2.5">
+      <Search :size="15" :stroke-width="2" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-meta" />
       <input
         v-model="searchQuery"
         type="text"
-        placeholder="Rechercher un joueur par nom..."
-        class="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
-               text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+        placeholder="Rechercher un joueur par nom…"
+        class="w-full h-10 pl-9 pr-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
+               text-sm outline-none focus:border-brand transition-colors"
       />
     </div>
 
     <!-- Filtres -->
-    <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
-      <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 shrink-0">
-        Joueurs ({{ visiblePlayers.length }})
-      </h2>
-      <div class="flex items-center gap-2 flex-wrap">
-        <select
-          v-model="filterTeamId"
-          class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
-                 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
-        >
-          <option value="ALL">Toutes les équipes</option>
-          <option v-for="t in teamsStore.teams" :key="t.id" :value="t.id">{{ t.name }}</option>
-        </select>
-        <select
-          v-if="positions.length > 0"
-          v-model="filterPosition"
-          class="h-8 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs
-                 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
-        >
-          <option value="ALL">Tous les postes</option>
-          <option v-for="pos in positions" :key="pos" :value="pos">{{ pos }}</option>
-        </select>
-        <button
-          class="text-xs text-neutral-600 hover:text-neutral-400 transition-colors whitespace-nowrap"
-          @click="showArchived = !showArchived"
-        >
-          {{ showArchived ? 'Masquer les archivés' : 'Voir les archivés' }}
-        </button>
-      </div>
+    <div class="flex items-center gap-1.5 mb-3 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+      <button
+        class="flex-none h-8 px-2.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors"
+        :class="filterTeamId === 'ALL' ? 'bg-brand-soft border-brand-line text-brand-ink' : 'bg-surface border-line text-ink-secondary'"
+        @click="filterTeamId = 'ALL'"
+      >
+        Toutes équipes
+      </button>
+      <button
+        v-for="t in teamsStore.teams"
+        :key="t.id"
+        class="flex-none h-8 px-2.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors"
+        :class="filterTeamId === t.id ? 'bg-brand-soft border-brand-line text-brand-ink' : 'bg-surface border-line text-ink-secondary'"
+        @click="filterTeamId = t.id"
+      >
+        {{ t.name }}
+      </button>
+      <select
+        v-if="positions.length > 0"
+        v-model="filterPosition"
+        class="flex-none h-8 px-2 rounded-full bg-surface border border-line text-ink-secondary text-xs outline-none [color-scheme:dark]"
+      >
+        <option value="ALL">Tous les postes</option>
+        <option v-for="pos in positions" :key="pos" :value="pos">{{ pos }}</option>
+      </select>
+      <button
+        class="flex-none text-xs text-ink-meta hover:text-ink-secondary transition-colors whitespace-nowrap px-1"
+        @click="showArchived = !showArchived"
+      >
+        {{ showArchived ? 'Masquer les archivés' : 'Voir les archivés' }}
+      </button>
     </div>
 
     <div v-if="playersStore.loading" class="flex items-center justify-center py-10">
-      <div class="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+      <div class="w-6 h-6 rounded-full border-2 border-line-strong border-t-ink animate-spin" />
     </div>
 
-    <p v-else-if="visiblePlayers.length === 0 && playersStore.players.length === 0" class="text-sm text-neutral-600 text-center py-8">
-      Aucun joueur pour le moment. Ajoutez votre effectif ci-dessus.
+    <p v-else-if="visiblePlayers.length === 0 && playersStore.players.length === 0" class="text-sm text-ink-meta text-center py-8">
+      Aucun joueur — ajoute le premier
     </p>
 
-    <p v-else-if="visiblePlayers.length === 0" class="text-sm text-neutral-600 text-center py-8">
-      Aucun joueur ne correspond à cette recherche.
+    <p v-else-if="visiblePlayers.length === 0" class="text-sm text-ink-meta text-center py-8">
+      Aucun joueur ne correspond à cette recherche
     </p>
 
-    <div v-else class="space-y-1.5">
+    <div v-else class="grid grid-cols-2 gap-2">
       <div
-        v-for="player in visiblePlayers"
+        v-for="(player, i) in visiblePlayers"
         :key="player.id"
-        class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/8"
+        class="min-w-0 flex flex-col gap-2 p-3 bg-surface border border-line rounded-card transition-colors"
         :class="{ 'opacity-50': !player.active }"
       >
-        <button
-          class="flex items-center gap-3 flex-1 min-w-0 text-left"
-          @click="router.push({ name: 'player-profile', params: { id: player.id } })"
-        >
-          <span class="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-neutral-300 shrink-0">
-            {{ player.number ?? '—' }}
+        <button class="flex items-center justify-between gap-1.5 text-left" @click="router.push({ name: 'player-profile', params: { id: player.id } })">
+          <span
+            class="flex items-center justify-center w-[38px] h-[38px] rounded-full font-data text-xs font-bold border"
+            :style="{ background: avatarStyle(i).bg, borderColor: avatarStyle(i).border, color: avatarStyle(i).fg }"
+          >
+            {{ deriveInitials(player.name.replace(/\s+/, '.')) }}
           </span>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-white font-medium truncate">{{ player.name }}</p>
-            <p class="text-xs text-neutral-500 truncate">
-              {{ teamName(player.teamId) }}<span v-if="player.position"> · {{ player.position }}</span>
-            </p>
-          </div>
+          <span class="font-score text-xs font-bold text-ink-disabled">{{ player.number ?? '—' }}</span>
         </button>
-        <button
-          v-if="clubsStore.canWrite"
-          class="text-xs text-neutral-500 hover:text-white transition-colors px-2 py-1"
-          @click="startEdit(player.id)"
-        >
-          Modifier
+        <button class="min-w-0 text-left" @click="router.push({ name: 'player-profile', params: { id: player.id } })">
+          <p class="text-[13px] font-medium text-ink truncate">{{ player.name }}</p>
+          <p class="mt-0.5 text-[11px] text-ink-meta truncate">
+            {{ teamName(player.teamId) }}<span v-if="player.position"> · {{ player.position }}</span>
+          </p>
         </button>
-        <button
-          v-if="clubsStore.canWrite"
-          class="text-xs px-2 py-1 rounded-md transition-colors"
-          :class="player.active ? 'text-red-400 hover:bg-red-500/10' : 'text-green-400 hover:bg-green-500/10'"
-          @click="toggleActive(player.id, player.active)"
-        >
-          {{ player.active ? 'Archiver' : 'Réactiver' }}
-        </button>
+        <div v-if="clubsStore.canWrite" class="flex items-center gap-2.5 flex-wrap">
+          <span v-if="!player.active" class="font-data text-[9px] text-warning">archivé</span>
+          <button class="text-[11px] text-ink-meta hover:text-ink-secondary transition-colors" @click="startEdit(player.id)">Modifier</button>
+          <button
+            class="text-[11px] transition-colors"
+            :class="player.active ? 'text-danger hover:opacity-80' : 'text-brand-ink hover:opacity-80'"
+            @click="toggleActive(player.id, player.active)"
+          >
+            {{ player.active ? 'Archiver' : 'Réactiver' }}
+          </button>
+        </div>
       </div>
     </div>
+
+    <button
+      v-if="clubsStore.canWrite"
+      class="flex items-center justify-center gap-1.5 w-full h-11 mt-3 rounded-btn border border-dashed border-line-strong text-ink-secondary text-[13px] font-medium hover:text-ink hover:bg-surface hover:border-ink-meta transition-colors"
+      @click="showForm = true"
+    >
+      <Plus :size="15" :stroke-width="2" />
+      Ajouter un joueur
+    </button>
 
     <!-- Popup ajout / édition -->
     <div
@@ -245,84 +250,78 @@ async function toggleActive(id: string, active: boolean) {
       class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
       @click.self="resetForm"
     >
-      <div class="w-full max-w-md bg-neutral-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
+      <div class="w-full max-w-md bg-surface border border-line rounded-card p-6">
         <div class="flex items-center justify-between mb-6">
-          <h2 class="text-lg font-semibold text-white">{{ editingId ? 'Modifier le joueur' : 'Nouveau joueur' }}</h2>
-          <button
-            class="text-neutral-500 hover:text-white transition-colors p-1"
-            @click="resetForm"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+          <h2 class="text-lg font-semibold text-ink">{{ editingId ? 'Modifier le joueur' : 'Nouveau joueur' }}</h2>
+          <button class="text-ink-meta hover:text-ink transition-colors p-1" @click="resetForm">
+            <X :size="18" :stroke-width="2" />
           </button>
         </div>
 
         <form class="space-y-4" @submit.prevent="handleSubmit">
           <div class="grid grid-cols-[1fr_auto] gap-3">
             <div class="space-y-1">
-              <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Nom</label>
+              <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Nom</label>
               <input
                 v-model="name"
                 type="text"
                 required
                 placeholder="Ex: Karim B."
                 maxlength="50"
-                class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
-                       text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+                class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
+                       text-sm outline-none focus:border-brand transition-colors"
               />
             </div>
             <div class="space-y-1 w-20">
-              <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">N°</label>
+              <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">N°</label>
               <input
                 v-model="number"
                 type="number"
                 min="1"
                 max="99"
                 placeholder="9"
-                class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
-                       text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+                class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
+                       text-sm outline-none focus:border-brand transition-colors"
               />
             </div>
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Poste (optionnel)</label>
+            <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Poste (optionnel)</label>
             <input
               v-model="position"
               type="text"
-              placeholder="Ex: Attaquant, Milieu, Défenseur..."
+              placeholder="Ex: Attaquant, Milieu, Défenseur…"
               maxlength="40"
-              class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
-                     text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+              class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
+                     text-sm outline-none focus:border-brand transition-colors"
             />
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Équipe</label>
+            <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Équipe</label>
             <select
               v-model="teamId"
-              class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white
-                     text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all [color-scheme:dark]"
+              class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink
+                     text-sm outline-none focus:border-brand transition-colors [color-scheme:dark]"
             >
               <option v-if="clubsStore.isOwner" :value="null">Sans équipe</option>
               <option v-for="t in selectableTeams" :key="t.id" :value="t.id">
                 {{ t.name }}<span v-if="t.division"> · {{ t.division }}</span>
               </option>
             </select>
-            <p v-if="teamsStore.teams.length === 0" class="text-xs text-neutral-600">
+            <p v-if="teamsStore.teams.length === 0" class="text-xs text-ink-meta">
               Aucune équipe créée pour le moment —
-              <button type="button" class="underline hover:text-white" @click="emit('go-teams')">en créer une</button>
+              <button type="button" class="underline hover:text-ink" @click="emit('go-teams')">en créer une</button>
             </p>
           </div>
 
-          <p v-if="errorMessage" class="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+          <p v-if="errorMessage" class="text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2">
             {{ errorMessage }}
           </p>
 
           <div class="flex gap-3 pt-2">
             <button
               type="button"
-              class="flex-1 h-11 rounded-lg border border-white/10 text-neutral-400 text-sm font-medium
-                     hover:border-white/20 hover:text-white transition-all"
+              class="flex-1 h-11 rounded-btn border border-line text-ink-secondary text-sm font-medium hover:border-line-strong hover:text-ink transition-colors"
               @click="resetForm"
             >
               Annuler
@@ -330,10 +329,9 @@ async function toggleActive(id: string, active: boolean) {
             <button
               type="submit"
               :disabled="saving || !name.trim()"
-              class="flex-1 h-11 rounded-lg bg-white text-neutral-900 text-sm font-semibold
-                     hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              class="flex-1 h-11 rounded-btn bg-brand text-brand-soft text-sm font-semibold hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <span v-if="saving">Enregistrement...</span>
+              <span v-if="saving">Enregistrement…</span>
               <span v-else-if="editingId">Mettre à jour</span>
               <span v-else>Ajouter au club</span>
             </button>

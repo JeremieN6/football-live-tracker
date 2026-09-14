@@ -3,7 +3,9 @@ import { computed } from 'vue'
 
 type LogoSize = 'compact' | 'medium' | 'large'
 
-const props = withDefaults(defineProps<{ size?: LogoSize }>(), { size: 'medium' })
+// `width` permet un format ponctuel (ex. 98×42 sur AuthView) sans ajouter une 4e
+// variante figée : le ratio 120:52 du viewBox est toujours respecté.
+const props = withDefaults(defineProps<{ size?: LogoSize; width?: number }>(), { size: 'medium' })
 
 const dimensions: Record<LogoSize, { width: number; height: number }> = {
   compact: { width: 36, height: 16 },
@@ -11,7 +13,10 @@ const dimensions: Record<LogoSize, { width: number; height: number }> = {
   large: { width: 120, height: 52 },
 }
 
-const dims = computed(() => dimensions[props.size])
+const dims = computed(() => {
+  if (props.width) return { width: props.width, height: Math.round((props.width * 52) / 120) }
+  return dimensions[props.size]
+})
 </script>
 
 <template>

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
+import NrvLogo from '@/components/NrvLogo.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -17,8 +18,17 @@ const loading = ref(false)
 async function handleSubmit() {
   errorMessage.value = null
   successMessage.value = null
-  loading.value = true
 
+  if (!email.value.trim() || !password.value) {
+    errorMessage.value = 'Email et mot de passe requis.'
+    return
+  }
+  if (password.value.length < 6) {
+    errorMessage.value = 'Mot de passe trop court — 6 caractères minimum.'
+    return
+  }
+
+  loading.value = true
   try {
     if (mode.value === 'login') {
       await authStore.signIn(email.value, password.value)
@@ -27,7 +37,7 @@ async function handleSubmit() {
       const needsConfirmation = await authStore.signUp(email.value, password.value)
       if (needsConfirmation) {
         // Supabase a envoyé un email de confirmation — on reste sur la page
-        successMessage.value = 'Compte créé ! Vérifiez votre email pour confirmer votre inscription.'
+        successMessage.value = 'Compte créé — vérifie ton email pour confirmer ton inscription.'
       } else {
         // Confirmation email désactivée — session créée directement
         await router.push({ name: 'home' })
@@ -39,7 +49,7 @@ async function handleSubmit() {
       if (err.message.includes('Invalid login credentials')) {
         errorMessage.value = 'Email ou mot de passe incorrect.'
       } else if (err.message.includes('Email not confirmed')) {
-        errorMessage.value = 'Email non confirmé. Vérifiez votre boîte mail.'
+        errorMessage.value = 'Email non confirmé — vérifie ta boîte mail.'
       } else if (err.message.includes('User already registered')) {
         errorMessage.value = 'Un compte existe déjà avec cet email.'
       } else {
@@ -61,28 +71,27 @@ function toggleMode() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-950 flex items-center justify-center px-4">
-    <div class="w-full max-w-sm">
+  <div class="min-h-screen bg-app flex flex-col justify-center px-6">
+    <div class="w-full max-w-sm mx-auto">
 
       <!-- Logo / Titre -->
-      <div class="mb-10 text-center">
-        <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/10 mb-4">
-          <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-white" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 2a10 10 0 0 1 0 20M2 12h20M12 2c-2.5 3-4 6.3-4 10s1.5 7 4 10M12 2c2.5 3 4 6.3 4 10s-1.5 7-4 10" />
-          </svg>
-        </div>
-        <h1 class="text-2xl font-semibold text-white tracking-tight">NRV</h1>
-        <p class="text-sm text-neutral-400 mt-1">
-          {{ mode === 'login' ? 'Connectez-vous à votre compte' : 'Créez votre compte' }}
+      <div class="flex flex-col items-center gap-2.5 mb-[34px]">
+        <NrvLogo :width="98" />
+        <p class="text-[13px] font-medium text-ink-meta">Nouveau Rectangle Vert</p>
+        <p class="font-score text-[13px] font-bold text-ink mt-0.5">
+          Analyse tactique. <span class="text-brand">Niveau énervé.</span>
         </p>
       </div>
 
-      <!-- Formulaire -->
-      <form class="space-y-4" @submit.prevent="handleSubmit">
+      <h1 class="text-[22px] font-semibold text-ink text-center mb-4">
+        {{ mode === 'login' ? 'Connexion' : 'Rejoindre' }}
+      </h1>
 
-        <div class="space-y-1">
-          <label class="text-sm font-medium text-neutral-300" for="email">Email</label>
+      <!-- Formulaire -->
+      <form class="flex flex-col gap-3.5 bg-surface border border-line rounded-card p-5" @submit.prevent="handleSubmit">
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary" for="email">Email</label>
           <input
             id="email"
             v-model="email"
@@ -90,13 +99,13 @@ function toggleMode() {
             required
             autocomplete="email"
             placeholder="vous@exemple.com"
-            class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-500
-                   text-sm focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/20 transition-all"
+            class="h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
+                   text-sm outline-none focus:border-brand transition-colors"
           />
         </div>
 
-        <div class="space-y-1">
-          <label class="text-sm font-medium text-neutral-300" for="password">Mot de passe</label>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary" for="password">Mot de passe</label>
           <input
             id="password"
             v-model="password"
@@ -104,42 +113,43 @@ function toggleMode() {
             required
             autocomplete="current-password"
             placeholder="••••••••"
-            class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-500
-                   text-sm focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/20 transition-all"
+            class="h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
+                   text-sm outline-none focus:border-brand transition-colors"
           />
         </div>
 
         <!-- Message d'erreur -->
-        <p v-if="errorMessage" class="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+        <p v-if="errorMessage" class="text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-2.5 py-2">
           {{ errorMessage }}
         </p>
 
         <!-- Message de succès (confirmation email) -->
-        <p v-if="successMessage" class="text-sm text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg px-3 py-2">
+        <p v-if="successMessage" class="text-[13px] text-brand-ink bg-brand-soft border border-brand-line rounded-input px-2.5 py-2">
           {{ successMessage }}
         </p>
 
-        <!-- Bouton submit -->
+        <!-- CTA -->
         <button
           type="submit"
           :disabled="loading"
-          class="w-full h-11 rounded-lg bg-white text-neutral-900 font-semibold text-sm
-                 hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-white/30
-                 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          class="h-12 rounded-btn bg-brand text-brand-soft font-semibold text-sm
+                 hover:bg-brand-hover focus:outline-none focus:ring-2 focus:ring-brand/40
+                 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          <span v-if="loading">Chargement...</span>
+          <span v-if="loading">Chargement…</span>
           <span v-else>{{ mode === 'login' ? 'Se connecter' : 'Créer le compte' }}</span>
         </button>
       </form>
 
       <!-- Toggle login / register -->
-      <p class="mt-6 text-center text-sm text-neutral-500">
+      <p class="mt-[18px] text-center text-sm text-ink-meta">
         {{ mode === 'login' ? 'Pas encore de compte ?' : 'Déjà un compte ?' }}
         <button
-          class="text-neutral-300 font-medium hover:text-white underline underline-offset-2 transition-colors ml-1"
+          type="button"
+          class="text-ink-secondary font-medium underline underline-offset-2 hover:text-brand-ink transition-colors ml-1"
           @click="toggleMode"
         >
-          {{ mode === 'login' ? 'Créer un compte' : 'Se connecter' }}
+          {{ mode === 'login' ? 'Rejoindre' : 'Se connecter' }}
         </button>
       </p>
 

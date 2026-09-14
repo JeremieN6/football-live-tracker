@@ -22,11 +22,14 @@
   --color-ink-meta: #6B7280;
   --color-ink-disabled: #4B5563;
 
-  --color-accent: #16A34A;
-  --color-accent-hover: #15803d;
-  --color-accent-line: #166534;
-  --color-accent-soft: #052e16;
-  --color-accent-ink: #4ADE80;
+  /* "brand" et non "accent" : `--accent` est deja un token shadcn (neutre, utilise par
+     des composants UI generiques) redefini plus bas dans ce fichier — reutiliser son nom
+     ici se ferait ecraser silencieusement par la valeur shadcn (constate en test visuel). */
+  --color-brand: #16A34A;
+  --color-brand-hover: #15803d;
+  --color-brand-line: #166534;
+  --color-brand-soft: #052e16;
+  --color-brand-ink: #4ADE80;
 
   --color-pitch: #1a3d0f;
 

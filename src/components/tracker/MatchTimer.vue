@@ -45,11 +45,7 @@ function confirmReset() {
     </div>
 
     <!-- Chrono -->
-<<<<<<< HEAD
-    <div class="flex items-baseline justify-center gap-2 mt-0.5">
-=======
     <div class="flex items-center flex-col justify-center gap-2.5 mt-0.5">
->>>>>>> 3d72f7e (Fix layout of the chrono section in MatchTimer component)
       <span class="font-score text-[36px] font-bold leading-[1.1] text-ink">{{ props.display }}</span>
       <span
         v-if="props.addedTimeDisplay"

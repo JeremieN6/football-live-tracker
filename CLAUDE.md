@@ -72,10 +72,7 @@ Construire un SaaS "Match Report AI" pour coachs amateurs : suivi live des evene
   - Aucun ecran n'a pu etre verifie visuellement avec de vraies donnees (pas de session utilisateur authentifiee possible depuis cet environnement de session, seul l'acces direct a la base via Supabase MCP est disponible) — a tester par l'utilisateur.
 
 ### Prochaines etapes :
-- [ ] **Tester en conditions reelles toute la refonte visuelle** (les 7 ecrans + la page reglages du club) — priorite avant tout le reste, rien n'a ete verifie avec de vraies donnees dans un vrai navigateur
-- [ ] **Trancher les 2 ecarts assumes de la refonte, avec l'utilisateur** :
-  1. TrackerView : palette reduite a 11 evenements (CORNER_AGAINST/FREE_KICK_AGAINST retires de l'UI) — a confirmer volontaire ou remettre les 13
-  2. ClubView : onglet "Effectif" = roster `players` et non membres `club_members` (voir Decisions Prises) — a confirmer ou construire le lien manquant en base
+- [ ] **Tester en conditions reelles toute la refonte visuelle** (les 7 ecrans + la page reglages du club + le nouvel onglet Membres de ClubView) — priorite avant tout le reste, rien n'a ete verifie avec de vraies donnees dans un vrai navigateur
 - [ ] Remplir `/club/settings` (annee de fondation, localisation) pour voir la vraie ligne meta sur HomeView
 - [ ] Repondre/verifier la question "un coach de l'equipe 1 voit-il les donnees de l'equipe 2 ?" cote produit maintenant que les stats par equipe existent — reponse actuelle : non pour les matchs/evenements/rapports (RLS par equipe), mais oui pour la liste des joueurs (`players` reste lecture club-wide, voir Decisions Prises Phase B) ; a reconfirmer si ca doit changer
 - [ ] Tester en conditions reelles la hierarchie de roles etendue (PRESIDENT/CATEGORY_MANAGER/ADJOINT) : inviter un vrai membre sous chacun de ces roles, verifier lecture/ecriture attendues dans l'app (pas seulement en simulation SQL)

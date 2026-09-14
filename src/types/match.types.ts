@@ -78,6 +78,8 @@ export interface Club {
   name: string
   ownerId: string
   status: ClubStatus
+  foundedYear: number | null
+  location: string | null
   createdAt: string
 }
 

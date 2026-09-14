@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, ChevronRight, Users, Shield, LogOut } from 'lucide-vue-next'
+import { Plus, ChevronRight, Users, Shield, LogOut, Settings } from 'lucide-vue-next'
 import { useMatchStore } from '@/stores/match.store'
 import { useAuthStore } from '@/stores/auth.store'
 import { useClubsStore } from '@/stores/clubs.store'
@@ -134,6 +134,15 @@ const clubInitials = computed(() => deriveInitials(clubsStore.club?.name?.replac
 const membershipBadge = computed(() =>
   clubsStore.membership ? ROLE_BADGES[clubsStore.membership.role] : null,
 )
+
+const clubMeta = computed(() => {
+  const club = clubsStore.club
+  if (!club) return ''
+  const parts: string[] = []
+  if (club.foundedYear) parts.push(`fondé en ${club.foundedYear}`)
+  if (club.location) parts.push(club.location)
+  return parts.join(' · ')
+})
 </script>
 
 <template>
@@ -164,6 +173,13 @@ const membershipBadge = computed(() =>
             @click="showMenu = false; router.push({ name: 'members' })"
           >
             <Users :size="16" :stroke-width="2" class="text-ink-meta" /> Membres
+          </button>
+          <button
+            v-if="clubsStore.isOwner"
+            class="w-full h-11 px-3 flex items-center gap-2.5 text-sm text-ink-body hover:bg-surface-hover transition-colors text-left"
+            @click="showMenu = false; router.push({ name: 'club-settings' })"
+          >
+            <Settings :size="16" :stroke-width="2" class="text-ink-meta" /> Réglages du club
           </button>
           <button
             v-if="adminStore.isAdmin"
@@ -201,6 +217,7 @@ const membershipBadge = computed(() =>
         <div class="flex-1 min-w-0">
           <p class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Ton club</p>
           <h1 class="mt-[5px] text-[18px] font-semibold text-ink truncate">{{ clubsStore.club?.name ?? 'Ton club' }}</h1>
+          <p v-if="clubMeta" class="mt-[5px] text-[11px] text-ink-meta truncate">{{ clubMeta }}</p>
           <div v-if="membershipBadge" class="mt-[9px]">
             <RoleBadge :role="clubsStore.membership!.role" />
           </div>

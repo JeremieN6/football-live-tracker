@@ -10,6 +10,8 @@ export function rowToClub(row: Record<string, unknown>): Club {
     name: row.name as string,
     ownerId: row.owner_id as string,
     status: row.status as Club['status'],
+    foundedYear: (row.founded_year as number | null) ?? null,
+    location: (row.location as string | null) ?? null,
     createdAt: row.created_at as string,
   }
 }
@@ -198,11 +200,18 @@ export const useClubsStore = defineStore('clubs', () => {
     }
   }
 
-  async function renameClub(name: string) {
+  // Met à jour l'identité du club (nom, année de fondation, localisation) — réservé
+  // au propriétaire côté UI (RLS `clubs_update_own` l'impose de toute façon en base).
+  async function updateClubInfo(payload: { name: string; foundedYear: number | null; location: string | null }) {
     if (!club.value) return
-    const { error: sbError } = await supabase.from('clubs').update({ name }).eq('id', club.value.id)
+    const { error: sbError } = await supabase
+      .from('clubs')
+      .update({ name: payload.name, founded_year: payload.foundedYear, location: payload.location })
+      .eq('id', club.value.id)
     if (sbError) throw sbError
-    club.value.name = name
+    club.value.name = payload.name
+    club.value.foundedYear = payload.foundedYear
+    club.value.location = payload.location
   }
 
   function reset() {
@@ -211,5 +220,5 @@ export const useClubsStore = defineStore('clubs', () => {
     error.value = null
   }
 
-  return { club, membership, isOwner, canWrite, hasTeamAccess, loading, error, ensureClub, createClub, renameClub, reset }
+  return { club, membership, isOwner, canWrite, hasTeamAccess, loading, error, ensureClub, createClub, updateClubInfo, reset }
 })

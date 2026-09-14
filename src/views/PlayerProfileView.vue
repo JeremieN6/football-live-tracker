@@ -6,6 +6,7 @@ import { usePlayersStore } from '@/stores/players.store'
 import { usePlayerProfileStore } from '@/stores/playerProfile.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { useClubsStore } from '@/stores/clubs.store'
+import AppHeader from '@/components/AppHeader.vue'
 import ClubCrest from '@/components/ClubCrest.vue'
 import type { Player } from '@/types/match.types'
 
@@ -63,6 +64,8 @@ const statItems = () => [
 
 <template>
   <div class="min-h-screen bg-app flex flex-col text-ink">
+
+    <AppHeader />
 
     <!-- Header -->
     <div class="flex-none sticky top-0 z-30 bg-app/90 backdrop-blur-sm border-b border-line px-4 py-3 flex items-center gap-2.5">

@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
 import { useAdminClubsStore } from '@/stores/adminClubs.store'
 import { extractErrorMessage } from '@/lib/errors'
+import AppHeader from '@/components/AppHeader.vue'
 
-const router = useRouter()
 const adminStore = useAdminClubsStore()
 
 const checking = ref(true)
@@ -64,10 +62,9 @@ async function handleReject(id: string, name: string) {
 <template>
   <div class="min-h-screen bg-app flex flex-col text-ink">
 
-    <div class="flex-none flex items-center gap-1 px-4 pt-3.5 pb-2">
-      <button class="p-1 -ml-1 text-ink-meta hover:text-ink transition-colors" @click="router.push({ name: 'home' })">
-        <ArrowLeft :size="18" :stroke-width="2" />
-      </button>
+    <AppHeader back />
+
+    <div class="flex-none px-4 pt-3.5 pb-2">
       <h1 class="text-[20px] font-semibold text-ink">Administration</h1>
     </div>
 

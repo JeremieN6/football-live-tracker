@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ArrowLeft, Upload } from 'lucide-vue-next'
+import { Upload } from 'lucide-vue-next'
 import { useClubsStore } from '@/stores/clubs.store'
 import { extractErrorMessage } from '@/lib/errors'
+import AppHeader from '@/components/AppHeader.vue'
 import ClubCrest from '@/components/ClubCrest.vue'
 
-const router = useRouter()
 const clubsStore = useClubsStore()
 
 const name = ref('')
@@ -108,10 +107,9 @@ async function handleSubmit() {
 <template>
   <div class="min-h-screen bg-app flex flex-col text-ink">
 
-    <div class="flex-none flex items-center gap-1 px-4 pt-3.5 pb-2">
-      <button class="p-1 -ml-1 text-ink-meta hover:text-ink transition-colors" @click="router.push({ name: 'home' })">
-        <ArrowLeft :size="18" :stroke-width="2" />
-      </button>
+    <AppHeader back />
+
+    <div class="flex-none px-4 pt-3.5 pb-2">
       <h1 class="text-[20px] font-semibold text-ink">Réglages du club</h1>
     </div>
 

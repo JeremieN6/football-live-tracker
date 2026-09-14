@@ -34,17 +34,17 @@ async function handleSignOut() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-neutral-950 text-white flex items-center justify-center px-4">
+  <div class="min-h-screen bg-app text-ink flex items-center justify-center px-4">
     <div class="w-full max-w-sm">
-      <h1 class="text-lg font-semibold mb-2 text-center">Créer votre club</h1>
-      <p class="text-sm text-neutral-500 mb-6 text-center">
+      <h1 class="text-lg font-semibold text-ink mb-2 text-center">Créer votre club</h1>
+      <p class="text-sm text-ink-meta mb-6 text-center">
         Aucun club ne vous est encore rattaché. Donnez un nom à votre club pour continuer —
         il sera ensuite validé par un administrateur avant de devenir utilisable.
       </p>
 
       <form class="space-y-4" @submit.prevent="handleSubmit">
         <div class="space-y-1">
-          <label class="text-xs font-medium text-neutral-400 uppercase tracking-wide">Nom du club</label>
+          <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Nom du club</label>
           <input
             v-model="name"
             type="text"
@@ -52,26 +52,25 @@ async function handleSignOut() {
             autofocus
             placeholder="Ex: FC Tourcoing"
             maxlength="60"
-            class="w-full h-11 px-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-neutral-600
-                   text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+            class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
+                   text-sm outline-none focus:border-brand transition-colors"
           />
         </div>
 
-        <p v-if="errorMessage" class="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+        <p v-if="errorMessage" class="text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2">
           {{ errorMessage }}
         </p>
 
         <button
           type="submit"
           :disabled="saving || !name.trim()"
-          class="w-full h-11 rounded-lg bg-white text-neutral-900 text-sm font-semibold
-                 hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          class="w-full h-11 rounded-btn bg-brand text-brand-soft text-sm font-semibold hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {{ saving ? 'Création...' : 'Créer le club' }}
+          {{ saving ? 'Création…' : 'Créer le club' }}
         </button>
         <button
           type="button"
-          class="w-full h-10 text-neutral-500 hover:text-white text-sm transition-colors"
+          class="w-full h-10 text-ink-meta hover:text-ink text-sm transition-colors"
           @click="handleSignOut"
         >
           Déconnexion

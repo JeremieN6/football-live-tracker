@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
 import { supabase } from '@/services/supabase'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { useMatchStore } from '@/stores/match.store'
 import { outcomeFor } from '@/lib/matchBadges'
+import AppHeader from '@/components/AppHeader.vue'
 import type { Match } from '@/types/match.types'
 
 const route = useRoute()
@@ -122,14 +122,11 @@ function formatDate(dateStr: string): string {
 <template>
   <div class="min-h-screen bg-app flex flex-col text-ink">
 
-    <div class="flex-none flex items-center gap-2 px-4 pt-3.5 pb-2">
-      <button class="p-1 -ml-1 text-ink-meta hover:text-ink transition-colors" @click="router.push({ name: 'home' })">
-        <ArrowLeft :size="18" :stroke-width="2" />
-      </button>
-      <div class="min-w-0">
-        <h1 class="text-[20px] font-semibold text-ink truncate">{{ team?.name ?? 'Équipe' }}</h1>
-        <p v-if="team?.category" class="text-[11px] text-ink-meta">{{ team.category }}</p>
-      </div>
+    <AppHeader back />
+
+    <div class="flex-none px-4 pt-3.5 pb-2">
+      <h1 class="text-[20px] font-semibold text-ink truncate">{{ team?.name ?? 'Équipe' }}</h1>
+      <p v-if="team?.category" class="text-[11px] text-ink-meta">{{ team.category }}</p>
     </div>
 
     <main class="flex-1 px-4 pb-8 max-w-lg w-full mx-auto">

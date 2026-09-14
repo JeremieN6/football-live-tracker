@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
 import { useMatchStore } from '@/stores/match.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { MATCH_STATUS_BADGES, outcomeFor } from '@/lib/matchBadges'
+import AppHeader from '@/components/AppHeader.vue'
 import CreateMatchModal from '@/components/tracker/CreateMatchModal.vue'
 import type { Match } from '@/types/match.types'
 
@@ -100,14 +100,11 @@ function openDetails(m: Match) {
 <template>
   <div class="min-h-screen bg-app flex flex-col text-ink">
 
+    <AppHeader back />
+
     <div class="flex-none px-4 pt-3.5">
       <div class="flex items-center justify-between gap-2.5">
-        <div class="flex items-center gap-1">
-          <button class="p-1 -ml-1 text-ink-meta hover:text-ink transition-colors" @click="router.push({ name: 'home' })">
-            <ArrowLeft :size="18" :stroke-width="2" />
-          </button>
-          <h1 class="text-[20px] font-semibold text-ink">Matchs</h1>
-        </div>
+        <h1 class="text-[20px] font-semibold text-ink">Matchs</h1>
         <button
           v-if="clubsStore.canWrite"
           class="h-9 px-3 rounded-[9px] border border-brand-line bg-brand text-brand-soft font-semibold text-xs hover:bg-brand-hover transition-colors"

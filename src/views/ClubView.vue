@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useClubMembersStore } from '@/stores/clubMembers.store'
+import AppHeader from '@/components/AppHeader.vue'
 import ClubCrest from '@/components/ClubCrest.vue'
 import TeamsSection from '@/components/club/TeamsSection.vue'
 import RosterSection from '@/components/club/RosterSection.vue'
@@ -49,11 +49,10 @@ const tabs = computed(() => [
 <template>
   <div class="min-h-screen bg-app flex flex-col text-ink">
 
+    <AppHeader back />
+
     <div class="flex-none px-4 pt-3.5">
-      <div class="flex items-center gap-2 -ml-1">
-        <button class="p-1 text-ink-meta hover:text-ink transition-colors" @click="router.push({ name: 'home' })">
-          <ArrowLeft :size="18" :stroke-width="2" />
-        </button>
+      <div class="flex items-center gap-2">
         <ClubCrest :logo-url="clubsStore.club?.logoUrl" :name="clubsStore.club?.name" size="sm" />
         <h1 class="text-[20px] font-semibold text-ink">{{ clubsStore.club?.name ?? 'Ton club' }}</h1>
       </div>

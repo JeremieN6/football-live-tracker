@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, ChevronRight, Users, Shield, LogOut, Settings } from 'lucide-vue-next'
+import { Plus, ChevronRight } from 'lucide-vue-next'
 import { useMatchStore } from '@/stores/match.store'
-import { useAuthStore } from '@/stores/auth.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
-import { useAdminClubsStore } from '@/stores/adminClubs.store'
-import { deriveDisplayName, deriveInitials } from '@/lib/displayName'
+import { deriveInitials } from '@/lib/displayName'
 import { ROLE_BADGES } from '@/lib/roleBadge'
 import { OUTCOME_BADGES, outcomeFor } from '@/lib/matchBadges'
-import NrvLogo from '@/components/NrvLogo.vue'
+import AppHeader from '@/components/AppHeader.vue'
 import RoleBadge from '@/components/RoleBadge.vue'
 import ClubCrest from '@/components/ClubCrest.vue'
 import CreateMatchModal from '@/components/tracker/CreateMatchModal.vue'
@@ -19,14 +17,11 @@ import type { Match } from '@/types/match.types'
 
 const router = useRouter()
 const matchStore = useMatchStore()
-const authStore = useAuthStore()
 const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
 const playersStore = usePlayersStore()
-const adminStore = useAdminClubsStore()
 
 const showCreateModal = ref(false)
-const showMenu = ref(false)
 const loading = ref(true)
 
 onMounted(async () => {
@@ -37,7 +32,6 @@ onMounted(async () => {
       playersStore.fetchPlayers(),
       club ? teamsStore.fetchTeams(club.id) : Promise.resolve(),
     ])
-    adminStore.checkAdmin().catch(() => {})
   } finally {
     loading.value = false
   }
@@ -60,12 +54,6 @@ function formatDay(dateStr: string): string {
 }
 function formatMonth(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('fr-FR', { month: 'short' })
-}
-
-async function handleSignOut() {
-  showMenu.value = false
-  await authStore.signOut()
-  router.push({ name: 'auth' })
 }
 
 function openReport(id: string) {
@@ -147,55 +135,7 @@ const clubMeta = computed(() => {
 <template>
   <div class="min-h-screen bg-app flex flex-col text-ink">
 
-    <!-- Barre du haut -->
-    <header class="flex-none flex items-center justify-between gap-2.5 px-4 py-3 border-b border-line">
-      <NrvLogo :width="66" />
-      <div class="relative">
-        <button class="flex items-center gap-2" @click="showMenu = !showMenu">
-          <span class="text-[11px] text-ink-meta">{{ deriveDisplayName(authStore.user?.email) }}</span>
-          <span
-            v-if="membershipBadge"
-            class="flex items-center justify-center w-[30px] h-[30px] rounded-full font-data text-[11px] font-bold border"
-            :style="{ background: membershipBadge.bg, borderColor: membershipBadge.border, color: membershipBadge.fg }"
-          >
-            {{ deriveInitials(authStore.user?.email) }}
-          </span>
-        </button>
-
-        <div
-          v-if="showMenu"
-          class="absolute right-0 top-[38px] z-50 min-w-[168px] py-1 bg-surface border border-line rounded-card"
-          @click.self="showMenu = false"
-        >
-          <button
-            class="w-full h-11 px-3 flex items-center gap-2.5 text-sm text-ink-body hover:bg-surface-hover transition-colors text-left"
-            @click="showMenu = false; router.push({ name: 'club', query: { tab: 'members' } })"
-          >
-            <Users :size="16" :stroke-width="2" class="text-ink-meta" /> Membres
-          </button>
-          <button
-            v-if="clubsStore.isOwner"
-            class="w-full h-11 px-3 flex items-center gap-2.5 text-sm text-ink-body hover:bg-surface-hover transition-colors text-left"
-            @click="showMenu = false; router.push({ name: 'club-settings' })"
-          >
-            <Settings :size="16" :stroke-width="2" class="text-ink-meta" /> Réglages du club
-          </button>
-          <button
-            v-if="adminStore.isAdmin"
-            class="w-full h-11 px-3 flex items-center gap-2.5 text-sm text-ink-body hover:bg-surface-hover transition-colors text-left"
-            @click="showMenu = false; router.push({ name: 'admin-clubs' })"
-          >
-            <Shield :size="16" :stroke-width="2" class="text-ink-meta" /> Administration
-          </button>
-          <button
-            class="w-full h-11 px-3 flex items-center gap-2.5 text-sm text-danger hover:bg-surface-hover transition-colors text-left"
-            @click="handleSignOut"
-          >
-            <LogOut :size="16" :stroke-width="2" /> Déconnexion
-          </button>
-        </div>
-      </div>
-    </header>
+    <AppHeader />
 
     <!-- Chargement -->
     <div v-if="loading" class="flex-1 flex flex-col gap-2.5 px-4 pt-3.5 pb-[18px]">

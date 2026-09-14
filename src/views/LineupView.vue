@@ -9,6 +9,7 @@ import { useClubsStore } from '@/stores/clubs.store'
 import { FORMATIONS, ROLE_COLORS, isFormationId, type FormationId } from '@/lib/formations'
 import { deriveInitials } from '@/lib/displayName'
 import { extractErrorMessage } from '@/lib/errors'
+import { supabase } from '@/services/supabase'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +29,63 @@ const pickedSlot = ref<string | null>(null)
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 
+// Prefill "11 du match précédent" : proposé uniquement si ce match n'a pas
+// encore de composition enregistrée et qu'un match antérieur de la même
+// équipe a une composition titulaire placée sur le terrain (slot_id renseigné).
+const showPrefillPrompt = ref(false)
+const previousLineup = ref<{ formation: FormationId; assign: Record<string, string> } | null>(null)
+
+async function checkPreviousLineup() {
+  const match = matchStore.currentMatch
+  if (!match?.teamId || !clubsStore.canWrite) return
+
+  const { data: prevMatches } = await supabase
+    .from('matches')
+    .select('id, formation')
+    .eq('team_id', match.teamId)
+    .lt('date', match.date)
+    .order('date', { ascending: false })
+    .limit(1)
+
+  const prevMatch = prevMatches?.[0]
+  if (!prevMatch) return
+
+  const { data: prevEntries } = await supabase
+    .from('match_lineups')
+    .select('player_id, slot_id')
+    .eq('match_id', prevMatch.id)
+    .eq('role', 'STARTER')
+    .not('slot_id', 'is', null)
+
+  if (!prevEntries || prevEntries.length === 0) return
+
+  const prevAssign: Record<string, string> = {}
+  for (const e of prevEntries) prevAssign[e.slot_id as string] = e.player_id as string
+
+  previousLineup.value = {
+    formation: isFormationId(prevMatch.formation) ? (prevMatch.formation as FormationId) : formation.value,
+    assign: prevAssign,
+  }
+  showPrefillPrompt.value = true
+}
+
+function applyPreviousLineup() {
+  if (!previousLineup.value) return
+  formation.value = previousLineup.value.formation
+  // Ne garde que les joueurs toujours actifs dans l'équipe (effectif a pu changer).
+  const squadIds = new Set(squad.value.map((p) => p.id))
+  const next: Record<string, string> = {}
+  for (const [slotId, playerId] of Object.entries(previousLineup.value.assign)) {
+    if (squadIds.has(playerId)) next[slotId] = playerId
+  }
+  assign.value = next
+  showPrefillPrompt.value = false
+}
+
+function dismissPrefillPrompt() {
+  showPrefillPrompt.value = false
+}
+
 onMounted(async () => {
   const club = await clubsStore.ensureClub().catch(() => null)
   await Promise.all([
@@ -44,6 +102,8 @@ onMounted(async () => {
     if (entry.role === 'STARTER' && entry.slotId) next[entry.slotId] = entry.playerId
   }
   assign.value = next
+
+  if (Object.keys(next).length === 0) await checkPreviousLineup()
 })
 
 // Le nouveau modèle n'a plus de 3e état "non convoqué" : tout joueur actif de
@@ -316,6 +376,34 @@ function handleViewOnly() {
       >
         Voir le match
       </button>
+    </div>
+
+    <!-- Prefill 11 du match précédent -->
+    <div
+      v-if="showPrefillPrompt"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
+      @click.self="dismissPrefillPrompt"
+    >
+      <div class="w-full max-w-sm bg-surface border border-line rounded-card p-6">
+        <h2 class="text-base font-semibold text-ink mb-1">Reprendre le 11 du match précédent ?</h2>
+        <p class="text-sm text-ink-secondary mb-5">
+          La composition titulaire du dernier match de cette équipe peut être posée directement sur le terrain — tu pourras l'ajuster ensuite.
+        </p>
+        <div class="flex gap-3">
+          <button
+            class="flex-1 h-11 rounded-btn border border-line text-ink-secondary text-sm font-medium hover:text-ink transition-colors"
+            @click="dismissPrefillPrompt"
+          >
+            Non merci
+          </button>
+          <button
+            class="flex-1 h-11 rounded-btn bg-brand text-brand-soft text-sm font-semibold hover:bg-brand-hover transition-colors"
+            @click="applyPreviousLineup"
+          >
+            Oui, reprendre
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>

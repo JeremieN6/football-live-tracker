@@ -1,10 +1,48 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap');
 
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Tokens de la refonte NRV (voir handoff design, 01-tokens.md) — valeurs normatives,
+   ne pas approximer. Génèrent des utilitaires Tailwind (bg-app, text-ink, rounded-card...). */
+@theme {
+  --color-app: #0f1923;
+  --color-surface: #1F2937;
+  --color-surface-hover: #263444;
+  --color-surface-sub: #161f2c;
+  --color-line: #374151;
+  --color-line-strong: #4B5563;
+
+  --color-ink: #F9FAFB;
+  --color-ink-body: #D1D5DB;
+  --color-ink-secondary: #9CA3AF;
+  --color-ink-meta: #6B7280;
+  --color-ink-disabled: #4B5563;
+
+  --color-accent: #16A34A;
+  --color-accent-hover: #15803d;
+  --color-accent-line: #166534;
+  --color-accent-soft: #052e16;
+  --color-accent-ink: #4ADE80;
+
+  --color-pitch: #1a3d0f;
+
+  --color-danger: #F87171;
+  --color-danger-soft: #450a0a;
+  --color-danger-line: #7f1d1d;
+  --color-warning: #D97706;
+
+  --radius-tag: 6px;
+  --radius-input: 8px;
+  --radius-btn: 10px;
+  --radius-card: 12px;
+
+  --font-score: 'Space Mono', 'IBM Plex Mono', monospace;
+  --font-data: 'JetBrains Mono', monospace;
+}
 
 @theme inline {
   --font-heading: var(--font-sans);

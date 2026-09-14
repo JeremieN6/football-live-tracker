@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Match Report AI icon 192">
-  <rect width="192" height="192" rx="28" fill="#0a0a0a" />
-  <g stroke="#22c55e" stroke-width="6" opacity="0.5">
-    <path d="M24 96h144" />
-    <path d="M96 24v144" />
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 32 32">
+  <title>NRV — app icon</title>
+  <rect width="192" height="192" rx="6" fill="#0d2810"></rect>
+  <g transform="translate(4 8)">
+    <path d="M0 7 L0 3 L4 0 L12 0" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="square" stroke-linejoin="miter"></path>
+    <path d="M12 16 L20 16 L24 12 L24 8" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="square" stroke-linejoin="miter"></path>
+    <text x="12" y="12.8" text-anchor="middle" font-family="Space Mono, IBM Plex Mono, monospace" font-size="9.4" font-weight="700" letter-spacing="-0.5" fill="#F9FAFB">NRV</text>
   </g>
-  <circle cx="96" cy="96" r="34" fill="#16a34a" />
-  <path d="M72 90h48v12H72z" fill="#e5e7eb" />
 </svg>

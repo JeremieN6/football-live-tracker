@@ -4,8 +4,8 @@
   "description": "Live tracking football et rapport tactique IA pour coachs amateurs.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a0a0a",
+  "background_color": "#0f1923",
+  "theme_color": "#0f1923",
   "lang": "fr",
   "icons": [
     {

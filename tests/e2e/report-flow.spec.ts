@@ -49,6 +49,16 @@ test('flow create match to report generation', async ({ page }) => {
   // La création redirige vers la composition (Lineup), pas directement vers le tracker.
   await expect(page).toHaveURL(/\/match\/[^/]+\/lineup$/)
 
+  // Si l'équipe a déjà un match antérieur avec une composition enregistrée,
+  // une popup "Reprendre le 11 du match précédent ?" apparaît par-dessus tout
+  // l'écran (overlay plein écran) — sans la fermer, les clics suivants sur le
+  // banc/le terrain sont soit bloqués soit absorbés par cet overlay, d'où des
+  // placements qui se perdaient de façon incohérente selon le timing.
+  const prefillNoThanks = page.getByRole('button', { name: 'Non merci' })
+  if (await prefillNoThanks.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await prefillNoThanks.click()
+  }
+
   // Place les 11 premiers joueurs du banc sur les 11 premières positions du
   // terrain, un par un (peu importe le poste réel — seul le compte de 11
   // compte). Le compteur "X/11 placés" est ré-attendu après chaque paire de

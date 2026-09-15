@@ -30,6 +30,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/claim-profile',
+    name: 'claim-profile',
+    component: () => import('@/views/ClaimProfileView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/admin/clubs',
     name: 'admin-clubs',
     component: () => import('@/views/AdminClubsView.vue'),
@@ -135,6 +141,15 @@ router.beforeEach(async (to) => {
 
   // Le club est actif : /pending et /create-club n'ont plus lieu d'être.
   if (to.name === 'pending' || to.name === 'create-club') {
+    return { name: 'home' }
+  }
+
+  // Un joueur invité (auto-inscription par lien magique) doit relier son
+  // compte à une fiche de l'effectif avant d'accéder au reste de l'app.
+  if (clubsStore.membership?.role === 'PLAYER' && !clubsStore.membership.hasPlayerProfile) {
+    return to.name === 'claim-profile' ? true : { name: 'claim-profile' }
+  }
+  if (to.name === 'claim-profile' && clubsStore.membership?.hasPlayerProfile !== false) {
     return { name: 'home' }
   }
 

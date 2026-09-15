@@ -67,11 +67,23 @@ export const useAuthStore = defineStore('auth', () => {
     return data.session === null
   }
 
+  // Connexion sans mot de passe : envoie un lien magique par email. Utilisé
+  // pour le parcours d'auto-inscription des joueurs invités (le joueur n'a
+  // rien à retenir — il clique le lien reçu, la session se crée toute seule
+  // au retour sur l'app via detectSessionInUrl).
+  async function signInWithMagicLink(email: string) {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    })
+    if (error) throw error
+  }
+
   async function signOut() {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
     user.value = null
   }
 
-  return { user, loading, init, signIn, signUp, signOut }
+  return { user, loading, init, signIn, signUp, signInWithMagicLink, signOut }
 })

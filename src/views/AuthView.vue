@@ -7,8 +7,9 @@ import NrvLogo from '@/components/NrvLogo.vue'
 const router = useRouter()
 const authStore = useAuthStore()
 
-// Mode : 'login' ou 'register'
-const mode = ref<'login' | 'register'>('login')
+// Mode : 'login' ou 'register' (mot de passe), ou 'magic' (lien par email,
+// sans mot de passe — pensé pour un joueur invité qui n'a rien à retenir)
+const mode = ref<'login' | 'register' | 'magic'>('login')
 const email = ref('')
 const password = ref('')
 const errorMessage = ref<string | null>(null)
@@ -18,6 +19,23 @@ const loading = ref(false)
 async function handleSubmit() {
   errorMessage.value = null
   successMessage.value = null
+
+  if (mode.value === 'magic') {
+    if (!email.value.trim()) {
+      errorMessage.value = 'Email requis.'
+      return
+    }
+    loading.value = true
+    try {
+      await authStore.signInWithMagicLink(email.value.trim())
+      successMessage.value = 'Lien envoyé — vérifie ta boîte mail et clique dessus pour te connecter.'
+    } catch (err: unknown) {
+      errorMessage.value = err instanceof Error ? err.message : 'Une erreur est survenue.'
+    } finally {
+      loading.value = false
+    }
+    return
+  }
 
   if (!email.value.trim() || !password.value) {
     errorMessage.value = 'Email et mot de passe requis.'
@@ -68,6 +86,12 @@ function toggleMode() {
   errorMessage.value = null
   successMessage.value = null
 }
+
+function toggleMagic() {
+  mode.value = mode.value === 'magic' ? 'login' : 'magic'
+  errorMessage.value = null
+  successMessage.value = null
+}
 </script>
 
 <template>
@@ -84,7 +108,7 @@ function toggleMode() {
       </div>
 
       <h1 class="text-[22px] font-semibold text-ink text-center mb-4">
-        {{ mode === 'login' ? 'Connexion' : 'Rejoindre' }}
+        {{ mode === 'magic' ? 'Recevoir un lien' : mode === 'login' ? 'Connexion' : 'Rejoindre' }}
       </h1>
 
       <!-- Formulaire -->
@@ -104,7 +128,7 @@ function toggleMode() {
           />
         </div>
 
-        <div class="flex flex-col gap-1.5">
+        <div v-if="mode !== 'magic'" class="flex flex-col gap-1.5">
           <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary" for="password">Mot de passe</label>
           <input
             id="password"
@@ -117,13 +141,16 @@ function toggleMode() {
                    text-sm outline-none focus:border-brand transition-colors"
           />
         </div>
+        <p v-else class="text-xs text-ink-meta -mt-1">
+          Pas de mot de passe : tu reçois un lien de connexion par email, valable pour une seule connexion.
+        </p>
 
         <!-- Message d'erreur -->
         <p v-if="errorMessage" class="text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-2.5 py-2">
           {{ errorMessage }}
         </p>
 
-        <!-- Message de succès (confirmation email) -->
+        <!-- Message de succès (confirmation email / lien envoyé) -->
         <p v-if="successMessage" class="text-[13px] text-brand-ink bg-brand-soft border border-brand-line rounded-input px-2.5 py-2">
           {{ successMessage }}
         </p>
@@ -137,12 +164,13 @@ function toggleMode() {
                  disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <span v-if="loading">Chargement…</span>
+          <span v-else-if="mode === 'magic'">Recevoir le lien</span>
           <span v-else>{{ mode === 'login' ? 'Se connecter' : 'Créer le compte' }}</span>
         </button>
       </form>
 
       <!-- Toggle login / register -->
-      <p class="mt-[18px] text-center text-sm text-ink-meta">
+      <p v-if="mode !== 'magic'" class="mt-[18px] text-center text-sm text-ink-meta">
         {{ mode === 'login' ? 'Pas encore de compte ?' : 'Déjà un compte ?' }}
         <button
           type="button"
@@ -150,6 +178,17 @@ function toggleMode() {
           @click="toggleMode"
         >
           {{ mode === 'login' ? 'Rejoindre' : 'Se connecter' }}
+        </button>
+      </p>
+
+      <!-- Toggle lien magique -->
+      <p class="mt-2 text-center text-sm text-ink-meta">
+        <button
+          type="button"
+          class="text-ink-secondary font-medium underline underline-offset-2 hover:text-brand-ink transition-colors"
+          @click="toggleMagic"
+        >
+          {{ mode === 'magic' ? 'Se connecter avec un mot de passe' : 'Ou recevoir un lien par email, sans mot de passe' }}
         </button>
       </p>
 

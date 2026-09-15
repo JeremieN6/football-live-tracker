@@ -29,6 +29,11 @@ export interface Membership {
   // automatique à toute équipe partageant une de ces catégories, y compris
   // une équipe créée après coup.
   categories: string[]
+  // Un membre de rôle PLAYER a-t-il déjà une fiche `players` reliée
+  // (players.member_id) ? Utilisé par le routeur pour rediriger vers
+  // /claim-profile tant qu'aucune fiche n'est reliée (auto-inscription par
+  // lien magique). Non pertinent pour les autres rôles (toujours true).
+  hasPlayerProfile: boolean
 }
 
 // Levée par ensureClub() quand l'utilisateur n'a ni club, ni invitation en
@@ -103,7 +108,7 @@ export const useClubsStore = defineStore('clubs', () => {
           .eq('club_id', existing.id)
           .eq('user_id', userData.user.id)
           .maybeSingle()
-        membership.value = { id: ownMemberRow?.id ?? null, role: 'OWNER', teamIds: [], categories: [] }
+        membership.value = { id: ownMemberRow?.id ?? null, role: 'OWNER', teamIds: [], categories: [], hasPlayerProfile: true }
         // Auto-réparation : un club sans aucune équipe (ex. suite à une migration ou un aléa)
         // ne doit pas rester bloqué sans équipe par défaut.
         const { count: teamCount, error: countError } = await supabase
@@ -150,12 +155,22 @@ export const useClubsStore = defineStore('clubs', () => {
           .eq('member_id', memberRow.id)
         if (categoryLinksError) throw categoryLinksError
 
+        let hasPlayerProfile = true
+        if (memberRow.role === 'PLAYER') {
+          const { count: profileCount } = await supabase
+            .from('players')
+            .select('id', { count: 'exact', head: true })
+            .eq('member_id', memberRow.id)
+          hasPlayerProfile = !!profileCount
+        }
+
         club.value = rowToClub(memberClub)
         membership.value = {
           id: memberRow.id,
           role: memberRow.role as Membership['role'],
           teamIds: (teamLinks ?? []).map((row) => row.team_id as string),
           categories: (categoryLinks ?? []).map((row) => row.category as string),
+          hasPlayerProfile,
         }
         return club.value
       }
@@ -209,7 +224,7 @@ export const useClubsStore = defineStore('clubs', () => {
       if (newMemberFetchError) throw newMemberFetchError
 
       club.value = rowToClub(newClub)
-      membership.value = { id: newMember.id, role: 'OWNER', teamIds: [], categories: [] }
+      membership.value = { id: newMember.id, role: 'OWNER', teamIds: [], categories: [], hasPlayerProfile: true }
       return club.value
     } catch (err: unknown) {
       error.value = extractErrorMessage(err, 'Erreur lors de la création du club.')
@@ -248,11 +263,17 @@ export const useClubsStore = defineStore('clubs', () => {
     return `${data.publicUrl}?t=${Date.now()}`
   }
 
+  // Marque la fiche joueur comme reliée sans re-fetch complet — appelé juste
+  // après claim_player_profile()/create_own_player_profile() (ClaimProfileView).
+  function markPlayerProfileClaimed() {
+    if (membership.value) membership.value.hasPlayerProfile = true
+  }
+
   function reset() {
     club.value = null
     membership.value = null
     error.value = null
   }
 
-  return { club, membership, isOwner, canWrite, hasTeamAccess, loading, error, ensureClub, createClub, updateClubInfo, uploadLogo, reset }
+  return { club, membership, isOwner, canWrite, hasTeamAccess, loading, error, ensureClub, createClub, updateClubInfo, uploadLogo, markPlayerProfileClaimed, reset }
 })

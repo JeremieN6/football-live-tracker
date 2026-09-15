@@ -19,18 +19,22 @@ test('flow create match to report generation', async ({ page }) => {
     await page.fill('#password', password ?? '')
     await page.getByRole('button', { name: 'Se connecter' }).click()
 
-    // Si la connexion échoue (mauvais identifiants, club en attente...),
-    // l'app affiche un message d'erreur sur /auth au lieu de rediriger —
-    // on le récupère pour un message d'échec clair plutôt qu'un simple
-    // timeout sur l'URL attendue.
-    const stillOnAuth = await page.waitForURL(/\/(home|auth)$/, { timeout: 8000 }).then(() => page.url().includes('/auth')).catch(() => true)
-    if (stillOnAuth) {
-      const errorText = await page.locator('.text-danger').first().textContent().catch(() => null)
-      throw new Error(`Connexion échouée sur /auth${errorText ? ` — message affiché : "${errorText.trim()}"` : ' — aucun message d\'erreur visible.'}`)
+    // Si la connexion échoue (mauvais identifiants...), l'app affiche un
+    // message d'erreur sur /auth au lieu de rediriger — on le récupère
+    // (avec un timeout court, sinon l'attente d'un élément absent bloque
+    // jusqu'au timeout global du test) pour un message d'échec clair.
+    await page.waitForURL((url) => !url.pathname.startsWith('/auth'), { timeout: 8000 }).catch(() => {})
+    if (page.url().includes('/auth')) {
+      const errorText = await page.locator('.text-danger').first().textContent({ timeout: 2000 }).catch(() => null)
+      throw new Error(`Connexion échouée, toujours sur /auth après 8s${errorText ? ` — message affiché : "${errorText.trim()}"` : ' — aucun message d\'erreur visible.'}`)
     }
   }
 
-  await expect(page).toHaveURL(/\/home$/)
+  // Le compte de test doit atterrir sur /home (club ACTIVE, ni en attente de
+  // validation ni sans club) — si ce n'est pas le cas, page.url() ci-dessous
+  // dans le message d'échec dit où il a atterri à la place (ex: /pending,
+  // /create-club, /claim-profile).
+  await expect(page, `URL inattendue après connexion : ${page.url()}`).toHaveURL(/\/home$/, { timeout: 10000 })
 
   const uniqueSuffix = Date.now().toString().slice(-6)
   const homeTeam = `E2E FC ${uniqueSuffix}`

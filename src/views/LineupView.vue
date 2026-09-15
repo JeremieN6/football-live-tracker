@@ -283,6 +283,7 @@ function handleViewOnly() {
         class="absolute flex flex-col items-center gap-[3px] -translate-x-1/2 -translate-y-1/2"
         :class="clubsStore.canWrite ? 'cursor-pointer' : ''"
         :style="{ left: `${slot.x}%`, top: `${slot.y}%` }"
+        :data-testid="`lineup-slot-${slot.id}`"
         @click="tapSlot(slot.id)"
       >
         <span
@@ -327,6 +328,7 @@ function handleViewOnly() {
           class="flex items-center gap-2.5 min-h-[52px] px-2.5 py-1.5 rounded-input border transition-colors"
           :class="[clubsStore.canWrite ? 'cursor-pointer' : '', pickedPlayer === p.id ? 'bg-surface-hover' : 'bg-surface']"
           :style="pickedPlayer === p.id ? { borderWidth: '1.5px', borderColor: '#16A34A' } : { borderColor: '#374151' }"
+          data-testid="lineup-bench-player"
           @click="tapPlayer(p.id)"
         >
           <span

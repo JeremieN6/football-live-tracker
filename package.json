@@ -12,6 +12,7 @@
     "e2e:install": "playwright install chromium"
   },
   "dependencies": {
+    "@sentry/vue": "^10.74.0",
     "@supabase/supabase-js": "^2.105.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

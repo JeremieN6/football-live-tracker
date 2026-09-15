@@ -27,6 +27,12 @@ const port = 4173
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // Le parcours complet (connexion -> match -> composition -> tracker ->
+  // rapport IA) dépasse largement le timeout par défaut de 30s, ne serait-ce
+  // que par l'appel à l'edge function `generate-report` (Anthropic) qui prend
+  // à lui seul plusieurs dizaines de secondes. Sans ça, aucun `timeout:` posé
+  // sur une assertion individuelle ne peut servir : le test est tué avant.
+  timeout: 180000,
   fullyParallel: false,
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',

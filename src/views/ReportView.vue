@@ -263,7 +263,7 @@ function exportPdf() {
 
         <!-- Sections du rapport (IA, seulement si généré) -->
         <template v-if="sections.length > 0">
-          <div v-for="(s, i) in sections" :key="s.num">
+          <div v-for="(s, i) in sections" :key="s.num" :data-testid="`report-section-${s.num}`">
             <div
               :class="s.tone === 'bad'
                 ? 'px-3.5 py-4 my-3.5 bg-[#1a0a0a] border-l-2 border-danger rounded-r-[10px]'
@@ -280,7 +280,7 @@ function exportPdf() {
                 />
               </button>
               <template v-if="isOpen(s.num)">
-                <p v-if="s.body" class="mt-2.5 text-sm text-ink-body leading-[1.7]">{{ s.body }}</p>
+                <p v-if="s.body" data-testid="report-section-body" class="mt-2.5 text-sm text-ink-body leading-[1.7]">{{ s.body }}</p>
                 <ul v-if="s.list" class="mt-2.5 flex flex-col gap-2">
                   <li v-for="(item, idx) in s.list" :key="idx" class="flex items-start gap-2 text-sm text-ink-body leading-[1.7]">
                     <span class="text-danger font-bold shrink-0">{{ idx + 1 }}.</span>

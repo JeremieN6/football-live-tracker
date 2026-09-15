@@ -103,23 +103,37 @@ test('flow create match to report generation', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/match\/[^/]+\/report$/)
 
+  // Le rapport se charge d'abord (spinner), puis le bouton d'analyse apparaît —
+  // sans cette attente, count() vaut 0 pendant le chargement et on ne cliquait
+  // simplement jamais sur "Analyser le match".
   const generateButton = page.getByRole('button', { name: /Analyser le match|Réanalyser/ })
-  if (await generateButton.count()) {
-    await generateButton.first().click()
+  await generateButton.first().waitFor({ state: 'visible', timeout: 20000 })
+  await generateButton.first().click()
+
+  // L'appel à l'edge function `generate-report` (Anthropic) prend plusieurs
+  // dizaines de secondes. Deux issues possibles : les sections apparaissent,
+  // ou une erreur s'affiche — on attend la première des deux pour remonter le
+  // vrai message d'erreur plutôt qu'un timeout opaque.
+  const errorBanner = page.locator('.text-danger.bg-danger-soft')
+  const firstSection = page.locator('[data-testid="report-section-01"]')
+
+  await Promise.race([
+    firstSection.waitFor({ state: 'visible', timeout: 120000 }),
+    errorBanner.waitFor({ state: 'visible', timeout: 120000 }),
+  ]).catch(() => {})
+
+  if (await errorBanner.isVisible()) {
+    const message = await errorBanner.textContent({ timeout: 2000 }).catch(() => null)
+    throw new Error(`Génération du rapport IA en échec — message affiché : "${message?.trim() ?? '(vide)'}"`)
   }
 
-  const summaryText = page.getByRole('heading', { name: 'Résumé du match' }).locator('xpath=../..').locator('p').first()
-  const offensiveText = page.getByRole('heading', { name: 'Jeu offensif' }).locator('xpath=../..').locator('p').first()
-  const defensiveText = page.getByRole('heading', { name: 'Jeu défensif' }).locator('xpath=../..').locator('p').first()
-  const tacticalText = page.getByRole('heading', { name: 'Lecture tactique' }).locator('xpath=../..').locator('p').first()
+  // Les 4 sections rédigées par l'IA (la 5e, "Axes d'amélioration", est une
+  // liste et pas un paragraphe — vérifiée séparément ci-dessous).
+  for (const num of ['01', '02', '03', '04']) {
+    const body = page.locator(`[data-testid="report-section-${num}"] [data-testid="report-section-body"]`)
+    await expect(body, `Section ${num} du rapport absente`).toBeVisible({ timeout: 30000 })
+    await expect(body, `Section ${num} du rapport vide`).not.toHaveText(/^\s*$/)
+  }
 
-  await expect(summaryText).toBeVisible({ timeout: 30000 })
-  await expect(offensiveText).toBeVisible({ timeout: 30000 })
-  await expect(defensiveText).toBeVisible({ timeout: 30000 })
-  await expect(tacticalText).toBeVisible({ timeout: 30000 })
-
-  await expect(summaryText).not.toHaveText(/^\s*$/)
-  await expect(offensiveText).not.toHaveText(/^\s*$/)
-  await expect(defensiveText).not.toHaveText(/^\s*$/)
-  await expect(tacticalText).not.toHaveText(/^\s*$/)
+  await expect(page.locator('[data-testid="report-section-05"] li').first()).toBeVisible({ timeout: 10000 })
 })

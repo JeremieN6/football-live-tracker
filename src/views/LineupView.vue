@@ -264,8 +264,14 @@ function handleViewOnly() {
       </div>
     </div>
 
+    <!-- Zone principale : empilee en mobile (terrain puis banc), en 2 colonnes
+         des lg (banc a gauche, terrain a droite). Avant, le terrain etait fige a
+         380px de haut : sur un ecran large mais peu haut, il ne restait qu'une
+         fente de quelques centimetres pour scroller tout l'effectif. -->
+    <div class="flex-1 min-h-0 flex flex-col lg:flex-row">
+
     <!-- Terrain -->
-    <div class="flex-none relative h-[380px] bg-pitch overflow-hidden">
+    <div class="flex-none h-[380px] lg:order-2 lg:flex-1 lg:h-auto lg:min-h-0 relative bg-pitch overflow-hidden">
       <div class="absolute inset-0" style="background: repeating-linear-gradient(to bottom, rgba(255,255,255,.022) 0 38px, transparent 38px 76px)" />
       <svg viewBox="0 0 68 105" preserveAspectRatio="none" class="absolute inset-0 w-full h-full pointer-events-none" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="0.4">
         <rect x="2" y="2" width="64" height="101" />
@@ -307,8 +313,11 @@ function handleViewOnly() {
       </div>
     </div>
 
+    <!-- Colonne banc + actions -->
+    <div class="flex-1 min-h-0 lg:order-1 lg:flex-none lg:w-[360px] flex flex-col lg:border-r lg:border-line">
+
     <!-- En-tête banc -->
-    <div class="flex-none flex items-center justify-between px-4 pt-2.5 pb-2 border-t border-line border-b border-line">
+    <div class="flex-none flex items-center justify-between px-4 pt-2.5 pb-2 border-t border-line border-b border-line lg:border-t-0">
       <span class="text-[13px] font-semibold text-ink">Banc</span>
       <span class="font-data text-[11px]" :class="complete ? 'text-brand-ink' : 'text-ink-meta'">{{ filledCount }}/11 placés</span>
     </div>
@@ -379,6 +388,9 @@ function handleViewOnly() {
         Voir le match
       </button>
     </div>
+
+    </div><!-- /colonne banc -->
+    </div><!-- /zone principale -->
 
     <!-- Prefill 11 du match précédent -->
     <div

@@ -52,10 +52,24 @@ test('flow create match to report generation', async ({ page }) => {
   // Place les 11 premiers joueurs du banc sur les 11 premières positions du
   // terrain, un par un (peu importe le poste réel — seul le compte de 11 compte).
   const slots = page.locator('[data-testid^="lineup-slot-"]')
+  const benchPlayers = page.locator('[data-testid="lineup-bench-player"]')
   const slotCount = await slots.count()
-  for (let i = 0; i < Math.min(11, slotCount); i++) {
-    await page.locator('[data-testid="lineup-bench-player"]').first().click()
+  const benchCount = await benchPlayers.count()
+  for (let i = 0; i < Math.min(11, slotCount, benchCount); i++) {
+    await benchPlayers.first().click()
     await slots.nth(i).click()
+  }
+
+  // Vérification explicite avant de cliquer "Lancer le tracker" (désactivé
+  // tant que les 11 titulaires ne sont pas placés) : si l'effectif de
+  // l'équipe du compte de test a moins de 11 joueurs actifs, le message
+  // d'échec le dit clairement plutôt qu'un timeout sur un bouton désactivé.
+  const filledLabel = await page.locator('text=/\\/11 placés/').textContent().catch(() => null)
+  if (!filledLabel?.startsWith('11/11')) {
+    throw new Error(
+      `Composition incomplète (${filledLabel ?? 'compteur introuvable'}) — ` +
+      `l'équipe du compte de test (${benchCount} joueur(s) dans l'effectif au départ) a besoin d'au moins 11 joueurs actifs pour que ce test aille au bout.`,
+    )
   }
 
   await page.getByRole('button', { name: 'Lancer le tracker' }).click()

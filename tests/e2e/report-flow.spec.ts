@@ -18,6 +18,16 @@ test('flow create match to report generation', async ({ page }) => {
     await page.fill('#email', email ?? '')
     await page.fill('#password', password ?? '')
     await page.getByRole('button', { name: 'Se connecter' }).click()
+
+    // Si la connexion échoue (mauvais identifiants, club en attente...),
+    // l'app affiche un message d'erreur sur /auth au lieu de rediriger —
+    // on le récupère pour un message d'échec clair plutôt qu'un simple
+    // timeout sur l'URL attendue.
+    const stillOnAuth = await page.waitForURL(/\/(home|auth)$/, { timeout: 8000 }).then(() => page.url().includes('/auth')).catch(() => true)
+    if (stillOnAuth) {
+      const errorText = await page.locator('.text-danger').first().textContent().catch(() => null)
+      throw new Error(`Connexion échouée sur /auth${errorText ? ` — message affiché : "${errorText.trim()}"` : ' — aucun message d\'erreur visible.'}`)
+    }
   }
 
   await expect(page).toHaveURL(/\/home$/)

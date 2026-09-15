@@ -169,45 +169,75 @@ const clubMeta = computed(() => {
           Aucun match — crée le premier
         </p>
 
-        <div v-else class="flex flex-col gap-2">
+        <!-- Le match le plus imminent garde un vrai bouton d'action ; les suivants
+             sont des lignes compactes cliquables (meme densite que "Derniers
+             resultats"), sinon 5 gros blocs identiques noient l'information. -->
+        <template v-else>
           <div
-            v-for="(match, index) in upcomingMatches"
-            :key="match.id"
             class="flex flex-col gap-2 p-[11px] rounded-[10px] bg-surface-sub border"
-            :class="match.status === 'LIVE' ? 'border-brand-line' : 'border-line'"
+            :class="upcomingMatches[0].status === 'LIVE' ? 'border-brand-line' : 'border-line'"
           >
             <div class="flex items-center gap-2.5">
               <div class="flex-none w-9 text-center">
-                <div class="font-score text-sm font-bold text-ink">{{ formatDay(match.date) }}</div>
-                <div class="text-[9px] font-medium tracking-[.5px] text-ink-meta">{{ formatMonth(match.date) }}</div>
+                <div class="font-score text-sm font-bold text-ink">{{ formatDay(upcomingMatches[0].date) }}</div>
+                <div class="text-[9px] font-medium tracking-[.5px] text-ink-meta">{{ formatMonth(upcomingMatches[0].date) }}</div>
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-[13px] font-medium text-ink truncate">{{ matchLabel(match) }}</p>
+                <p class="text-[13px] font-medium text-ink truncate">{{ matchLabel(upcomingMatches[0]) }}</p>
                 <div class="flex items-center gap-1.5 mt-[3px] min-w-0">
                   <span
-                    v-if="match.status === 'LIVE'"
+                    v-if="upcomingMatches[0].status === 'LIVE'"
                     class="inline-flex items-center gap-[5px] font-medium text-[9.5px] tracking-[.3px] px-[7px] py-[3px] rounded-full bg-brand-soft border border-brand-line text-brand-ink shrink-0"
                   >
                     <span class="w-[5px] h-[5px] rounded-full bg-[#22C55E] animate-nrv-pulse" />
                     En cours
                   </span>
                   <span class="text-[10.5px] text-ink-meta truncate">
-                    {{ teamName(match.teamId) }}<span v-if="match.competition"> · {{ match.competition }}</span>
+                    {{ teamName(upcomingMatches[0].teamId) }}<span v-if="upcomingMatches[0].competition"> · {{ upcomingMatches[0].competition }}</span>
                   </span>
                 </div>
               </div>
             </div>
             <button
-              class="h-11 rounded-btn text-[12.5px] font-semibold border"
-              :class="index === 0
-                ? 'bg-brand border-brand-line text-brand-soft hover:bg-brand-hover'
-                : 'bg-surface border-line-strong text-ink hover:bg-surface-hover'"
-              @click="openUpcoming(match, index)"
+              class="h-11 rounded-btn text-[12.5px] font-semibold border bg-brand border-brand-line text-brand-soft hover:bg-brand-hover transition-colors"
+              @click="openUpcoming(upcomingMatches[0], 0)"
             >
-              {{ matchCta(match, index).label }}
+              {{ matchCta(upcomingMatches[0], 0).label }}
             </button>
           </div>
-        </div>
+
+          <div v-if="upcomingMatches.length > 1" class="mt-1">
+            <button
+              v-for="(match, index) in upcomingMatches.slice(1)"
+              :key="match.id"
+              class="w-full flex items-center gap-2.5 py-[11px] text-left"
+              :class="index < upcomingMatches.length - 2 ? 'border-b border-[rgba(55,65,81,.6)]' : ''"
+              @click="openUpcoming(match, index + 1)"
+            >
+              <div class="flex-none w-9 text-center">
+                <div class="font-score text-sm font-bold text-ink">{{ formatDay(match.date) }}</div>
+                <div class="text-[9px] font-medium tracking-[.5px] text-ink-meta">{{ formatMonth(match.date) }}</div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[12.5px] font-medium text-ink truncate">{{ matchLabel(match) }}</p>
+                <div class="flex items-center gap-1.5 mt-0.5 min-w-0">
+                  <span
+                    v-if="match.status === 'LIVE'"
+                    class="inline-flex items-center gap-[5px] font-medium text-[9.5px] tracking-[.3px] px-[7px] py-[2px] rounded-full bg-brand-soft border border-brand-line text-brand-ink shrink-0"
+                  >
+                    <span class="w-[5px] h-[5px] rounded-full bg-[#22C55E] animate-nrv-pulse" />
+                    En cours
+                  </span>
+                  <span class="text-[10px] text-ink-meta truncate">
+                    {{ teamName(match.teamId) }}<span v-if="match.competition"> · {{ match.competition }}</span>
+                  </span>
+                </div>
+              </div>
+              <span class="flex-none text-[11px] font-medium text-ink-secondary">{{ matchCta(match, index + 1).label }}</span>
+              <ChevronRight :size="14" :stroke-width="2" class="flex-none text-ink-disabled" />
+            </button>
+          </div>
+        </template>
       </div>
 
       <!-- Effectif + Équipes -->

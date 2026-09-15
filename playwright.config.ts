@@ -2,26 +2,39 @@ import { defineConfig, devices } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-// Charge .env.e2e.local (E2E_SUPABASE_EMAIL/PASSWORD) sans dépendance
-// dotenv — rien ne lisait ce fichier jusque-là, le test se contentait de le
-// "skip" silencieusement faute de variables définies. Diagnostic affiché à
-// chaque lancement pour ne plus jamais échouer en silence sur ce point.
-const envPath = resolve(process.cwd(), '.env.e2e.local')
-if (existsSync(envPath)) {
-  let loaded = 0
+// Charge les fichiers d'environnement locaux sans dependance dotenv.
+// - .env.e2e.local : identifiants du compte de test (E2E_SUPABASE_EMAIL/PASSWORD)
+// - .env.local     : config Vite deja presente pour lancer l'app ; on y recupere
+//   l'URL et la cle anon pour que le test puisse supprimer lui-meme le match
+//   qu'il vient de creer (sinon chaque execution laisse un match fantome dans la
+//   vraie base). Rien de plus a renseigner a la main de ce fait.
+function loadEnvFile(fileName: string): Record<string, string> {
+  const envPath = resolve(process.cwd(), fileName)
+  const values: Record<string, string> = {}
+  if (!existsSync(envPath)) {
+    console.log(`[playwright.config] Aucun ${fileName} trouve a ${envPath}.`)
+    return values
+  }
   for (const rawLine of readFileSync(envPath, 'utf-8').split(/\r?\n/)) {
     const line = rawLine.trim()
     if (!line || line.startsWith('#')) continue
     const match = line.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/)
     if (!match) continue
-    const value = match[2].trim().replace(/^["']|["']$/g, '')
-    process.env[match[1]] = value
-    loaded++
+    values[match[1]] = match[2].trim().replace(/^["']|["']$/g, '')
   }
-  console.log(`[playwright.config] .env.e2e.local trouvé (${envPath}) — ${loaded} variable(s) chargée(s).`)
-} else {
-  console.log(`[playwright.config] Aucun .env.e2e.local trouvé à ${envPath} — le test e2e sera "skipped".`)
+  console.log(`[playwright.config] ${fileName} trouve (${envPath}) — ${Object.keys(values).length} variable(s) chargee(s).`)
+  return values
 }
+
+for (const [key, value] of Object.entries(loadEnvFile('.env.e2e.local'))) {
+  process.env[key] = value
+}
+
+// L'URL/cle anon viennent de .env.local (config Vite), sans ecraser une valeur
+// deja posee explicitement dans .env.e2e.local.
+const viteEnv = loadEnvFile('.env.local')
+process.env.E2E_SUPABASE_URL ??= viteEnv.VITE_SUPABASE_URL
+process.env.E2E_SUPABASE_ANON_KEY ??= viteEnv.VITE_SUPABASE_ANON_KEY
 
 const port = 4173
 

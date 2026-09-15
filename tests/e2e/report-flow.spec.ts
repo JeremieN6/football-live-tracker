@@ -6,6 +6,46 @@ import { test, expect } from '@playwright/test'
 // l'équipe par défaut si le club n'en a qu'une) — la composition (Lineup)
 // exige 11 titulaires placés avant de pouvoir lancer le tracker, il n'y a
 // plus de "passer sans effectif" pour un compte qui a le droit d'écrire.
+
+// Le test cree un vrai match dans la vraie base : sans ce nettoyage, chaque
+// execution laissait un match fantome ("E2E FC ...") dans l'accueil du club.
+// `reports` n'a PAS de ON DELETE CASCADE sur match_id (contrairement a `events`
+// et `match_lineups`), donc le rapport doit etre supprime AVANT le match.
+let createdMatchId: string | null = null
+
+test.afterEach(async ({ request }) => {
+  const matchId = createdMatchId
+  createdMatchId = null
+  if (!matchId) return
+
+  const url = process.env.E2E_SUPABASE_URL
+  const anonKey = process.env.E2E_SUPABASE_ANON_KEY
+  const email = process.env.E2E_SUPABASE_EMAIL
+  const password = process.env.E2E_SUPABASE_PASSWORD
+  if (!url || !anonKey || !email || !password) {
+    console.warn(`[e2e] Nettoyage impossible (config Supabase absente) — match ${matchId} laisse en base.`)
+    return
+  }
+
+  const auth = await request.post(`${url}/auth/v1/token?grant_type=password`, {
+    headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+    data: { email, password },
+  })
+  if (!auth.ok()) {
+    console.warn(`[e2e] Nettoyage impossible (connexion refusee) — match ${matchId} laisse en base.`)
+    return
+  }
+
+  const { access_token: accessToken } = await auth.json() as { access_token: string }
+  const headers = { apikey: anonKey, Authorization: `Bearer ${accessToken}` }
+
+  await request.delete(`${url}/rest/v1/reports?match_id=eq.${matchId}`, { headers })
+  const deleted = await request.delete(`${url}/rest/v1/matches?id=eq.${matchId}`, { headers })
+  if (!deleted.ok()) {
+    console.warn(`[e2e] Suppression du match ${matchId} refusee (${deleted.status()}) — a nettoyer a la main.`)
+  }
+})
+
 test('flow create match to report generation', async ({ page }) => {
   const email = process.env.E2E_SUPABASE_EMAIL
   const password = process.env.E2E_SUPABASE_PASSWORD
@@ -48,6 +88,9 @@ test('flow create match to report generation', async ({ page }) => {
 
   // La création redirige vers la composition (Lineup), pas directement vers le tracker.
   await expect(page).toHaveURL(/\/match\/[^/]+\/lineup$/)
+
+  // Retenu pour que le afterEach puisse supprimer ce match de la vraie base.
+  createdMatchId = page.url().match(/\/match\/([^/]+)\/lineup/)?.[1] ?? null
 
   // Si l'équipe a déjà un match antérieur avec une composition enregistrée,
   // une popup "Reprendre le 11 du match précédent ?" apparaît par-dessus tout

@@ -1,5 +1,5 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -43,8 +43,17 @@
   --radius-btn: 10px;
   --radius-card: 12px;
 
+  /* Inter etait importe depuis Google Fonts mais applique NULLE PART (aucun
+     font-family, aucun --font-sans defini) : toute l'app rendait donc dans la
+     police systeme du navigateur, alors que le design NRV est dessine en Inter. */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Space Mono garde une vraie utilite sur les scores et les gros compteurs :
+     les chiffres y sont a chasse fixe, donc une colonne de scores reste alignee. */
   --font-score: 'Space Mono', 'IBM Plex Mono', monospace;
-  --font-data: 'JetBrains Mono', monospace;
+  /* --font-data etait en JetBrains Mono : ce sont ces petits compteurs et initiales
+     qui donnaient l'aspect "machine a ecrire" signale par l'utilisateur. */
+  --font-data: var(--font-sans);
 }
 
 @theme inline {
@@ -170,6 +179,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
   /* color-scheme:dark seul ne suffit pas partout (Chrome/Windows notamment) pour
      styler la liste déroulante d'un <select> natif : on force le fond/texte des

@@ -52,10 +52,13 @@ test('flow create match to report generation', async ({ page }) => {
   // Si l'équipe a déjà un match antérieur avec une composition enregistrée,
   // une popup "Reprendre le 11 du match précédent ?" apparaît par-dessus tout
   // l'écran (overlay plein écran) — sans la fermer, les clics suivants sur le
-  // banc/le terrain sont soit bloqués soit absorbés par cet overlay, d'où des
-  // placements qui se perdaient de façon incohérente selon le timing.
+  // banc/le terrain sont soit bloqués soit absorbés par cet overlay. Elle
+  // n'apparaît qu'après une requête réseau (checkPreviousLineup), donc il
+  // faut une vraie attente qui réessaie (isVisible() ne fait qu'un seul
+  // coup d'œil immédiat, sans poll — c'est ça qui ratait la popup).
   const prefillNoThanks = page.getByRole('button', { name: 'Non merci' })
-  if (await prefillNoThanks.isVisible({ timeout: 3000 }).catch(() => false)) {
+  await prefillNoThanks.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {})
+  if (await prefillNoThanks.isVisible()) {
     await prefillNoThanks.click()
   }
 

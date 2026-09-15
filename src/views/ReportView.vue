@@ -206,7 +206,7 @@ function exportPdf() {
         <span class="font-score text-sm font-bold tracking-[1px] text-ink whitespace-nowrap">{{ scoreHome }} - {{ scoreAway }}</span>
         <span class="text-[11px] text-ink-meta whitespace-nowrap truncate">{{ matchStore.currentMatch?.homeTeam }} · {{ matchStore.currentMatch?.awayTeam }}</span>
       </div>
-      <span class="flex-none text-[11px] font-medium tracking-[.5px] text-brand-ink px-2 py-1 bg-brand-soft border border-brand-line rounded-full">Analyse IA</span>
+      <span class="flex-none text-[11px] font-medium tracking-[.5px] text-brand-ink px-2 py-1 bg-brand-soft border border-brand-line rounded-full">Analyse</span>
     </div>
 
     <!-- Chargement initial -->

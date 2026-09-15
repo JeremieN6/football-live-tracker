@@ -1,15 +1,26 @@
 import { defineConfig, devices } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
-// Charge tests/../.env.e2e.local (E2E_SUPABASE_EMAIL/PASSWORD) sans
-// dépendance dotenv — rien ne lisait ce fichier jusque-là, le test se
-// contentait de le "skip" silencieusement faute de variables définies.
-const envFile = '.env.e2e.local'
-if (existsSync(envFile)) {
-  for (const line of readFileSync(envFile, 'utf-8').split('\n')) {
-    const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/)
-    if (match && !(match[1] in process.env)) process.env[match[1]] = match[2].trim()
+// Charge .env.e2e.local (E2E_SUPABASE_EMAIL/PASSWORD) sans dépendance
+// dotenv — rien ne lisait ce fichier jusque-là, le test se contentait de le
+// "skip" silencieusement faute de variables définies. Diagnostic affiché à
+// chaque lancement pour ne plus jamais échouer en silence sur ce point.
+const envPath = resolve(process.cwd(), '.env.e2e.local')
+if (existsSync(envPath)) {
+  let loaded = 0
+  for (const rawLine of readFileSync(envPath, 'utf-8').split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const match = line.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/)
+    if (!match) continue
+    const value = match[2].trim().replace(/^["']|["']$/g, '')
+    process.env[match[1]] = value
+    loaded++
   }
+  console.log(`[playwright.config] .env.e2e.local trouvé (${envPath}) — ${loaded} variable(s) chargée(s).`)
+} else {
+  console.log(`[playwright.config] Aucun .env.e2e.local trouvé à ${envPath} — le test e2e sera "skipped".`)
 }
 
 const port = 4173

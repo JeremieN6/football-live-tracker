@@ -13,6 +13,8 @@ interface MatchRow {
   away_team: string
   competition: string
   date: string
+  club_id: string
+  team_id: string | null
 }
 
 interface EventRow {
@@ -282,16 +284,28 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabaseUser.auth.getUser()
     if (authError || !user) throw new Error("Non autorisé")
 
-    // Vérifier que le match appartient à l'utilisateur
-    const { data: match, error: matchError } = await supabaseAdmin
+    // Vérifier l'accès au match via le client UTILISATEUR (donc soumis au RLS)
+    // plutôt qu'en filtrant sur `created_by` : un coach, un adjoint ou un
+    // responsable de catégorie qui n'a pas créé le match lui-même y a
+    // pourtant droit (cf. policies basées sur can_access_team/can_write_team).
+    const { data: match, error: matchError } = await supabaseUser
       .from("matches")
-      .select("id, home_team, away_team, competition, date")
+      .select("id, home_team, away_team, competition, date, club_id, team_id")
       .eq("id", matchId)
-      .eq("created_by", user.id)
       .single()
     if (matchError || !match) {
       throw new Error(toErrorMessage(matchError, "Match introuvable"))
     }
+
+    // Générer un rapport écrit dans `reports`, dont les policies d'insert/update
+    // exigent can_write_team() : on le vérifie AVANT d'appeler l'IA, pour ne pas
+    // consommer un appel Anthropic payant avant de se faire refuser l'écriture.
+    const { data: canWrite, error: canWriteError } = await supabaseUser.rpc("can_write_team", {
+      target_club_id: match.club_id,
+      target_team_id: match.team_id,
+    })
+    if (canWriteError) throw new Error(toErrorMessage(canWriteError, "Erreur verification des droits"))
+    if (!canWrite) throw new Error("Vous n'avez pas les droits pour générer le rapport de ce match.")
 
     // Récupérer les événements
     const { data: events, error: eventsError } = await supabaseAdmin

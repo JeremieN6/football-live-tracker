@@ -1,4 +1,16 @@
 import { defineConfig, devices } from '@playwright/test'
+import { existsSync, readFileSync } from 'node:fs'
+
+// Charge tests/../.env.e2e.local (E2E_SUPABASE_EMAIL/PASSWORD) sans
+// dépendance dotenv — rien ne lisait ce fichier jusque-là, le test se
+// contentait de le "skip" silencieusement faute de variables définies.
+const envFile = '.env.e2e.local'
+if (existsSync(envFile)) {
+  for (const line of readFileSync(envFile, 'utf-8').split('\n')) {
+    const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/)
+    if (match && !(match[1] in process.env)) process.env[match[1]] = match[2].trim()
+  }
+}
 
 const port = 4173
 

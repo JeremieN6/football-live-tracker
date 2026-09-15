@@ -10,6 +10,8 @@ import { FORMATIONS, ROLE_COLORS, isFormationId, type FormationId } from '@/lib/
 import { deriveInitials } from '@/lib/displayName'
 import { extractErrorMessage } from '@/lib/errors'
 import { supabase } from '@/services/supabase'
+import { fetchEligibleTrackers, type EligibleTracker } from '@/lib/eligibleTrackers'
+import { Users } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -104,7 +106,46 @@ onMounted(async () => {
   assign.value = next
 
   if (Object.keys(next).length === 0) await checkPreviousLineup()
+
+  if (matchStore.currentMatch?.teamId) await loadEligibleTrackers(matchStore.currentMatch.teamId)
 })
+
+// Désignation du tracker après la création du match (CreateMatchModal ne
+// couvrait que la création) — visible uniquement pour qui peut écrire, un
+// tracker désigné n'a pas ce droit de délégation à son tour.
+const eligibleTrackers = ref<EligibleTracker[]>([])
+const loadingTrackers = ref(false)
+const showTrackerPanel = ref(false)
+const trackerSaving = ref(false)
+
+async function loadEligibleTrackers(teamId: string) {
+  loadingTrackers.value = true
+  try {
+    eligibleTrackers.value = await fetchEligibleTrackers(teamId, playersStore.players)
+  } catch {
+    // Non bloquant
+  } finally {
+    loadingTrackers.value = false
+  }
+}
+
+const currentTrackerLabel = computed(() => {
+  const id = matchStore.currentMatch?.designatedTrackerMemberId
+  if (!id) return 'Personne'
+  return eligibleTrackers.value.find((t) => t.memberId === id)?.label ?? 'Joueur désigné'
+})
+
+async function setTracker(memberId: string | null) {
+  trackerSaving.value = true
+  try {
+    await matchStore.updateDesignatedTracker(matchId, memberId)
+    showTrackerPanel.value = false
+  } catch (err: unknown) {
+    errorMessage.value = extractErrorMessage(err, 'Erreur lors de la désignation du tracker.')
+  } finally {
+    trackerSaving.value = false
+  }
+}
 
 // Le nouveau modèle n'a plus de 3e état "non convoqué" : tout joueur actif de
 // l'équipe du match est soit sur le terrain, soit sur le banc (cf. maquette
@@ -261,6 +302,44 @@ function handleViewOnly() {
         >
           {{ f }}
         </button>
+      </div>
+    </div>
+
+    <!-- Tracker delegue : desormais modifiable ici, pas seulement a la creation
+         du match (CreateMatchModal.vue) — un coach peut vouloir deleguer la
+         saisie apres coup. -->
+    <div v-if="clubsStore.canWrite && matchStore.currentMatch?.teamId" class="flex-none px-4 py-2 border-b border-line">
+      <button
+        class="w-full flex items-center gap-2 text-[12px] text-ink-secondary hover:text-ink transition-colors"
+        @click="showTrackerPanel = !showTrackerPanel"
+      >
+        <Users :size="13" :stroke-width="2" class="flex-none text-ink-disabled" />
+        <span>Tracker délégué :</span>
+        <span class="font-medium text-ink">{{ currentTrackerLabel }}</span>
+      </button>
+
+      <div v-if="showTrackerPanel" class="mt-2 flex flex-wrap gap-1.5">
+        <button
+          class="h-8 px-2.5 rounded-[7px] text-[11.5px] font-medium border transition-colors"
+          :class="!matchStore.currentMatch?.designatedTrackerMemberId ? 'bg-brand-soft border-brand-line text-brand-ink' : 'bg-surface-sub border-line text-ink-secondary'"
+          :disabled="trackerSaving"
+          @click="setTracker(null)"
+        >
+          Personne
+        </button>
+        <button
+          v-for="t in eligibleTrackers"
+          :key="t.memberId"
+          class="h-8 px-2.5 rounded-[7px] text-[11.5px] font-medium border transition-colors"
+          :class="matchStore.currentMatch?.designatedTrackerMemberId === t.memberId ? 'bg-brand-soft border-brand-line text-brand-ink' : 'bg-surface-sub border-line text-ink-secondary'"
+          :disabled="trackerSaving"
+          @click="setTracker(t.memberId)"
+        >
+          {{ t.label }}
+        </button>
+        <p v-if="!loadingTrackers && eligibleTrackers.length === 0" class="text-[11.5px] text-ink-meta py-1.5">
+          Aucun membre rattaché à cette équipe à désigner.
+        </p>
       </div>
     </div>
 

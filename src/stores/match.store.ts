@@ -151,5 +151,36 @@ export const useMatchStore = defineStore('match', () => {
     if (currentMatch.value?.id === id) currentMatch.value.formation = formation
   }
 
-  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatchStatus, finishMatch, updateFormation }
+  // Désigne (ou retire) le joueur autorisé à tracker CE match précis — utilisable
+  // aussi bien à la création qu'après coup (ex. le coach s'aperçoit après coup
+  // qu'il veut déléguer la saisie). RLS : matches_update_team_access exige déjà
+  // can_write_team(), donc aucune policy supplémentaire n'était nécessaire.
+  async function updateDesignatedTracker(id: string, memberId: string | null) {
+    const { error: sbError } = await supabase
+      .from('matches')
+      .update({ designated_tracker_member_id: memberId })
+      .eq('id', id)
+    if (sbError) throw sbError
+
+    const idx = matches.value.findIndex((m) => m.id === id)
+    if (idx !== -1) matches.value[idx].designatedTrackerMemberId = memberId
+    if (currentMatch.value?.id === id) currentMatch.value.designatedTrackerMemberId = memberId
+  }
+
+  // Supprime un match (et tout ce qui en dépend : events/match_lineups en
+  // cascade côté BDD, reports pas en cascade donc supprimé explicitement
+  // d'abord — cf. incident constaté avec le nettoyage du test e2e). RLS :
+  // matches_delete_team_access exige can_write_team(), donc en pratique
+  // réservé à OWNER/COACH/ADJOINT/CATEGORY_MANAGER — l'UI ne l'expose qu'au
+  // OWNER à la demande explicite de l'utilisateur.
+  async function deleteMatch(id: string) {
+    await supabase.from('reports').delete().eq('match_id', id)
+    const { error: sbError } = await supabase.from('matches').delete().eq('id', id)
+    if (sbError) throw sbError
+
+    matches.value = matches.value.filter((m) => m.id !== id)
+    if (currentMatch.value?.id === id) currentMatch.value = null
+  }
+
+  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatchStatus, finishMatch, updateFormation, updateDesignatedTracker, deleteMatch }
 })

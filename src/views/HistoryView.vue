@@ -5,6 +5,8 @@ import { useMatchStore } from '@/stores/match.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { MATCH_STATUS_BADGES, outcomeFor } from '@/lib/matchBadges'
+import { Trash2 } from 'lucide-vue-next'
+import { extractErrorMessage } from '@/lib/errors'
 import AppHeader from '@/components/AppHeader.vue'
 import CreateMatchModal from '@/components/tracker/CreateMatchModal.vue'
 import type { Match } from '@/types/match.types'
@@ -17,6 +19,9 @@ const teamsStore = useTeamsStore()
 const showCreateModal = ref(false)
 const activeTeam = ref<string>('ALL')
 const openId = ref<string | null>(null)
+const confirmDeleteId = ref<string | null>(null)
+const deleting = ref(false)
+const deleteError = ref<string | null>(null)
 
 onMounted(async () => {
   matchStore.fetchMatches()
@@ -94,6 +99,23 @@ function primaryAction(m: Match) {
 }
 function openDetails(m: Match) {
   router.push({ name: 'report', params: { id: m.id } })
+}
+
+// Suppression d'un match reservee au OWNER (demande explicite de l'utilisateur,
+// meme si can_write_team() autoriserait aussi COACH/ADJOINT/CATEGORY_MANAGER
+// cote RLS -- l'UI reste volontairement plus restrictive qu'elle ne pourrait l'etre).
+async function handleDelete(id: string) {
+  deleteError.value = null
+  deleting.value = true
+  try {
+    await matchStore.deleteMatch(id)
+    confirmDeleteId.value = null
+    openId.value = null
+  } catch (err: unknown) {
+    deleteError.value = extractErrorMessage(err, 'Erreur lors de la suppression du match.')
+  } finally {
+    deleting.value = false
+  }
 }
 </script>
 
@@ -211,12 +233,54 @@ function openDetails(m: Match) {
             >
               Détails
             </button>
+            <button
+              v-if="clubsStore.isOwner"
+              class="flex-none h-10 px-3 rounded-[9px] border border-line text-ink-secondary hover:text-danger hover:border-danger-line hover:bg-danger-soft transition-colors"
+              @click.stop="confirmDeleteId = m.id"
+            >
+              <Trash2 :size="15" :stroke-width="2" />
+            </button>
           </div>
         </div>
       </template>
     </div>
 
+    <!-- Erreur de suppression -->
+    <p v-if="deleteError" class="flex-none mx-4 mb-2 text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2">
+      {{ deleteError }}
+    </p>
+
     <!-- Modal création match -->
     <CreateMatchModal v-if="showCreateModal" @close="showCreateModal = false" />
+
+    <!-- Confirmation de suppression -->
+    <div
+      v-if="confirmDeleteId"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
+      @click.self="confirmDeleteId = null"
+    >
+      <div class="w-full max-w-sm bg-surface border border-line rounded-card p-6">
+        <h2 class="text-base font-semibold text-ink mb-1">Supprimer ce match ?</h2>
+        <p class="text-sm text-ink-secondary mb-5">
+          Le match, sa composition, ses événements et son rapport seront définitivement supprimés. Cette action est irréversible.
+        </p>
+        <div class="flex gap-3">
+          <button
+            class="flex-1 h-11 rounded-btn border border-line text-ink-secondary text-sm font-medium hover:text-ink transition-colors"
+            :disabled="deleting"
+            @click="confirmDeleteId = null"
+          >
+            Annuler
+          </button>
+          <button
+            class="flex-1 h-11 rounded-btn bg-danger text-white text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-50"
+            :disabled="deleting"
+            @click="handleDelete(confirmDeleteId)"
+          >
+            {{ deleting ? 'Suppression…' : 'Supprimer' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

@@ -8,6 +8,7 @@ import { useReportStore } from '@/stores/report.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useLineupStore } from '@/stores/lineup.store'
 import { eventMeta } from '@/lib/eventPalette'
+import AppHeader from '@/components/AppHeader.vue'
 import type { ReportStats } from '@/stores/report.store'
 import type { MatchEvent } from '@/types/match.types'
 
@@ -187,7 +188,13 @@ function exportPdf() {
 <template>
   <div class="h-dvh flex flex-col bg-app text-ink overflow-hidden">
 
-    <!-- Header -->
+    <!-- Header d'app commun (logo + menu avatar) — manquait sur cet ecran,
+         seul l'ecran Rapport n'avait pas encore ete rattrape le 15/09. -->
+    <AppHeader back />
+
+    <!-- Sous-header propre a l'ecran : retour precis vers "Matchs" (plus
+         pertinent ici que le retour generique vers l'accueil d'AppHeader),
+         score qui apparait au scroll, badge "Analyse IA". -->
     <div class="flex-none flex items-center justify-between gap-2 px-4 py-3 border-b border-line">
       <button class="text-[13px] font-medium text-ink-secondary hover:text-ink transition-colors" @click="router.push({ name: 'history' })">
         ← Historique

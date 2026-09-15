@@ -6,8 +6,7 @@ import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useRouter } from 'vue-router'
-import { supabase } from '@/services/supabase'
-import { deriveDisplayName } from '@/lib/displayName'
+import { fetchEligibleTrackers, type EligibleTracker } from '@/lib/eligibleTrackers'
 import { extractErrorMessage } from '@/lib/errors'
 
 const emit = defineEmits<{ close: [] }>()
@@ -28,7 +27,6 @@ const trackerMemberId = ref<string | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 
-interface EligibleTracker { memberId: string; label: string }
 const eligibleTrackers = ref<EligibleTracker[]>([])
 const loadingTrackers = ref(false)
 
@@ -50,28 +48,16 @@ onMounted(async () => {
 })
 
 // Membres rattachés à l'équipe choisie, éligibles pour être désignés "live
-// tracker" de ce match (délégation ponctuelle, pas les droits COACH/ADJOINT
-// complets — cf. matches.designated_tracker_member_id). Affiche le nom du
-// joueur lié si la fiche effectif est reliée au compte (players.member_id),
-// sinon un nom dérivé de son email.
+// tracker" de ce match (délégation ponctuelle, cf. matches.designated_tracker_member_id).
+// Logique factorisée dans src/lib/eligibleTrackers.ts (réutilisée pour changer
+// le tracker d'un match déjà créé, depuis LineupView).
 async function loadEligibleTrackers(team: string | null) {
   trackerMemberId.value = null
   eligibleTrackers.value = []
   if (!team) return
   loadingTrackers.value = true
   try {
-    const { data, error: sbError } = await supabase
-      .from('club_member_teams')
-      .select('member_id, club_members!inner(id, invited_email, status)')
-      .eq('team_id', team)
-      .eq('club_members.status', 'ACTIVE')
-    if (sbError) throw sbError
-    eligibleTrackers.value = (data ?? []).map((row) => {
-      const memberId = row.member_id as string
-      const player = playersStore.players.find((p) => p.memberId === memberId)
-      const member = row.club_members as unknown as { invited_email: string | null }
-      return { memberId, label: player?.name ?? deriveDisplayName(member?.invited_email) }
-    })
+    eligibleTrackers.value = await fetchEligibleTrackers(team, playersStore.players)
   } catch {
     // Non bloquant : le champ de délégation reste simplement vide en cas d'erreur
   } finally {

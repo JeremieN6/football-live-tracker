@@ -269,7 +269,7 @@ const clubMeta = computed(() => {
         </button>
 
         <button
-          class="flex flex-col min-w-0 p-3.5 bg-surface border border-line rounded-card text-left"
+          class="flex flex-col min-w-0 p-3.5 bg-surface border border-line rounded-card text-left hover:bg-surface-hover hover:border-line-strong transition-colors"
           @click="router.push({ name: 'club', query: { tab: 'teams' } })"
         >
           <span class="text-[13px] font-medium text-ink-secondary">Équipes</span>
@@ -278,7 +278,7 @@ const clubMeta = computed(() => {
             <div
               v-for="t in teamsStore.teams"
               :key="t.id"
-              class="flex items-center justify-between gap-2 min-w-0"
+              class="flex items-center justify-between gap-2 min-w-0 cursor-pointer hover:text-ink"
               @click.stop="router.push({ name: 'team-stats', params: { id: t.id } })"
             >
               <div class="min-w-0">
@@ -300,7 +300,7 @@ const clubMeta = computed(() => {
         <button
           v-for="(match, index) in recentResults"
           :key="match.id"
-          class="w-full flex items-center gap-2.5 py-[11px] text-left"
+          class="w-full flex items-center gap-2.5 py-[11px] text-left rounded-[9px] px-1.5 -mx-1.5 hover:bg-surface-hover transition-colors"
           :class="index < recentResults.length - 1 ? 'border-b border-[rgba(55,65,81,.6)]' : ''"
           @click="openReport(match.id)"
         >

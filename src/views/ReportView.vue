@@ -193,7 +193,7 @@ function exportPdf() {
         ← Historique
       </button>
       <div
-        class="flex items-center gap-2 overflow-hidden transition-all duration-200"
+        class="flex items-center flex-col gap-2 overflow-hidden transition-all duration-200"
         :style="{ opacity: scrolled ? 1 : 0, maxWidth: scrolled ? '220px' : '0px' }"
       >
         <span class="font-score text-sm font-bold tracking-[1px] text-ink whitespace-nowrap">{{ scoreDisplay.home }} - {{ scoreDisplay.away }}</span>

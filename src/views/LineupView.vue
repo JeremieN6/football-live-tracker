@@ -150,9 +150,53 @@ async function setTracker(memberId: string | null) {
 // Le nouveau modèle n'a plus de 3e état "non convoqué" : tout joueur actif de
 // l'équipe du match est soit sur le terrain, soit sur le banc (cf. maquette
 // Lineup). Un joueur écarté du match doit être archivé dans l'effectif.
+//
+// Quand le match est rattaché à une équipe précise (championnat), le vivier
+// reste exactement l'effectif de cette équipe, comme avant. Quand aucune
+// équipe n'est précisée (ex. match amical créé sans équipe exacte), le vivier
+// par défaut n'est plus TOUT le club (un U18 se retrouvait mélangé aux
+// seniors) mais le groupe Senior (teams.category contenant "senior") — les
+// joueurs d'une autre catégorie doivent être ajoutés explicitement via le
+// panneau "Inclure d'autres joueurs" ci-dessous.
+const SENIOR_CATEGORY = /s[ée]nior/i
+
+const seniorTeamIds = computed(
+  () => new Set(teamsStore.teams.filter((t) => SENIOR_CATEGORY.test(t.category ?? '')).map((t) => t.id)),
+)
+
+const extraPlayerIds = ref<Set<string>>(new Set())
+const showExtraPicker = ref(false)
+const extraCategory = ref<string | null>(null)
+
+// Catégories disponibles pour l'ajout ponctuel : toutes sauf "Senior", déduites
+// des équipes existantes (teams.category reste du texte libre saisi par le coach).
+const otherCategories = computed(() => {
+  const cats = new Set<string>()
+  for (const t of teamsStore.teams) {
+    if (t.category && !SENIOR_CATEGORY.test(t.category)) cats.add(t.category)
+  }
+  return [...cats].sort()
+})
+
+const extraCategoryPlayers = computed(() => {
+  if (!extraCategory.value) return []
+  const teamIds = new Set(teamsStore.teams.filter((t) => t.category === extraCategory.value).map((t) => t.id))
+  return playersStore.players.filter((p) => p.active && p.teamId && teamIds.has(p.teamId))
+})
+
+function toggleExtraPlayer(playerId: string) {
+  const next = new Set(extraPlayerIds.value)
+  if (next.has(playerId)) next.delete(playerId)
+  else next.add(playerId)
+  extraPlayerIds.value = next
+}
+
 const squad = computed(() => {
   const teamId = matchStore.currentMatch?.teamId
-  return playersStore.players.filter((p) => p.active && (!teamId || p.teamId === teamId))
+  if (teamId) return playersStore.players.filter((p) => p.active && p.teamId === teamId)
+  return playersStore.players.filter(
+    (p) => p.active && p.teamId && (seniorTeamIds.value.has(p.teamId) || extraPlayerIds.value.has(p.id)),
+  )
 })
 
 const slots = computed(() => FORMATIONS[formation.value])
@@ -401,10 +445,53 @@ function handleViewOnly() {
       <span class="font-data text-[11px]" :class="complete ? 'text-brand-ink' : 'text-ink-meta'">{{ filledCount }}/11 placés</span>
     </div>
 
+    <!-- Ajout ponctuel de joueurs d'une autre catégorie — uniquement pertinent
+         quand le match n'est pas rattaché à une équipe précise (le vivier par
+         défaut est alors le groupe Senior, pas tout le club). -->
+    <div v-if="clubsStore.canWrite && !matchStore.currentMatch?.teamId" class="flex-none px-4 pt-2 pb-1 border-b border-line">
+      <button
+        type="button"
+        class="text-[12px] text-ink-secondary hover:text-ink transition-colors"
+        @click="showExtraPicker = !showExtraPicker"
+      >
+        + Inclure des joueurs d'une autre catégorie
+      </button>
+
+      <div v-if="showExtraPicker" class="mt-2 space-y-2">
+        <select
+          v-model="extraCategory"
+          class="w-full h-9 px-2.5 rounded-input bg-surface-sub border border-line text-ink
+                 text-[13px] outline-none focus:border-brand transition-colors [color-scheme:dark]"
+        >
+          <option :value="null">Choisir une catégorie…</option>
+          <option v-for="c in otherCategories" :key="c" :value="c">{{ c }}</option>
+        </select>
+        <p v-if="extraCategory && extraCategoryPlayers.length === 0" class="text-[11.5px] text-ink-meta">
+          Aucun joueur actif dans cette catégorie.
+        </p>
+        <div v-else-if="extraCategory" class="flex flex-wrap gap-1.5">
+          <button
+            v-for="p in extraCategoryPlayers"
+            :key="p.id"
+            type="button"
+            class="text-[12px] px-2.5 py-1 rounded-full border transition-colors"
+            :class="extraPlayerIds.has(p.id)
+              ? 'bg-brand-soft border-brand-line text-brand-ink'
+              : 'bg-surface-sub border-line text-ink-secondary'"
+            @click="toggleExtraPlayer(p.id)"
+          >
+            {{ p.name }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Liste banc -->
     <div class="flex-1 min-h-0 overflow-y-auto px-3 py-2.5">
       <p v-if="squad.length === 0" class="px-4 py-6 text-center text-sm text-ink-meta">
-        {{ playersStore.loading ? 'Chargement…' : "Aucun joueur actif dans l'équipe de ce match — ajoute l'effectif d'abord." }}
+        <template v-if="playersStore.loading">Chargement…</template>
+        <template v-else-if="matchStore.currentMatch?.teamId">Aucun joueur actif dans l'équipe de ce match — ajoute l'effectif d'abord.</template>
+        <template v-else>Aucun joueur dans le groupe Senior — renseigne la catégorie "Senior" sur une équipe dans Mon club, ou inclus des joueurs d'une autre catégorie ci-dessus.</template>
       </p>
       <p v-else-if="bench.length === 0" class="px-4 py-4 text-center text-[13px] text-ink-meta">
         Banc vide — tous les joueurs sont sur le terrain

@@ -77,6 +77,11 @@ function chronologyLabel(event: MatchEvent): string {
     if (playerIn && playerOut) return `${playerIn} ↔ ${playerOut}`
     return label
   }
+  if (event.type === 'PENALTY_FOR' || event.type === 'PENALTY_AGAINST') {
+    const outcome = event.penaltyScored ? 'marqué' : 'manqué'
+    const taker = event.type === 'PENALTY_FOR' ? playerName(event.scorerId) : null
+    return taker ? `Pénalty ${outcome} — ${taker}` : `Pénalty ${outcome}`
+  }
   const player = playerName(event.playerId)
   return player ? `${label} — ${player}` : label
 }

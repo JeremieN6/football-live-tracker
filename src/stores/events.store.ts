@@ -23,6 +23,7 @@ function rowToEvent(row: Record<string, unknown>): MatchEvent {
     playerId: row.player_id as string | null,
     playerInId: row.player_in_id as string | null,
     playerOutId: row.player_out_id as string | null,
+    penaltyScored: row.penalty_scored as boolean | null,
     createdBy: row.created_by as string,
     createdAt: row.created_at as string,
   }
@@ -85,6 +86,7 @@ export const useEventsStore = defineStore('events', () => {
       player_id: event.playerId,
       player_in_id: event.playerInId,
       player_out_id: event.playerOutId,
+      penalty_scored: event.penaltyScored,
       created_by: userData.user.id,
     })
 

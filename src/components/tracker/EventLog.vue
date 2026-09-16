@@ -44,6 +44,11 @@ function label(event: MatchEvent): string {
     if (scorer) return `But — ${scorer}`
     return eventLabel(event.type)
   }
+  if (event.type === 'PENALTY_FOR' || event.type === 'PENALTY_AGAINST') {
+    const outcome = event.penaltyScored ? 'marqué' : 'manqué'
+    const taker = event.type === 'PENALTY_FOR' ? playerName(event.scorerId) : null
+    return taker ? `Pénalty ${outcome} — ${taker}` : `Pénalty ${outcome}`
+  }
   const player = playerName(event.playerId)
   if (player) return `${eventLabel(event.type)} — ${player}`
   return eventLabel(event.type)

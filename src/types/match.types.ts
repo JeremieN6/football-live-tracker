@@ -62,6 +62,11 @@ export interface MatchEvent {
   // Remplacement (SUBSTITUTION)
   playerInId: string | null
   playerOutId: string | null
+  // Pénalty transformé ou manqué (PENALTY_FOR/PENALTY_AGAINST uniquement —
+  // le tireur d'un PENALTY_FOR est stocké dans scorerId, réutilisé tel quel).
+  // Un pénalty marqué s'accompagne d'un événement GOAL_FOR/GOAL_AGAINST
+  // séparé, créé en même temps côté client (TrackerView.vue).
+  penaltyScored: boolean | null
   createdBy: string
   createdAt: string
 }

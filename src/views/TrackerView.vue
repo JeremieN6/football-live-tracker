@@ -19,6 +19,7 @@ import ActionButtons from '@/components/tracker/ActionButtons.vue'
 import SubstitutionModal from '@/components/tracker/SubstitutionModal.vue'
 import GoalDetailsModal from '@/components/tracker/GoalDetailsModal.vue'
 import PlayerEventModal from '@/components/tracker/PlayerEventModal.vue'
+import PenaltyModal from '@/components/tracker/PenaltyModal.vue'
 import EventLog from '@/components/tracker/EventLog.vue'
 import type { EventType, MatchEvent, ZoneX, ZoneY } from '@/types/match.types'
 
@@ -49,6 +50,8 @@ const pendingGoalPos = ref<{ pitchX: number; pitchY: number; zoneX: ZoneX; zoneY
 const pendingShotEvent = ref<{ type: EventType; pos: { pitchX: number; pitchY: number; zoneX: ZoneX; zoneY: ZoneY } } | null>(null)
 // Carton / ballon récupéré-perdu / interception / tacle en attente du joueur concerné (pas de tap terrain)
 const pendingPlayerEventType = ref<EventType | null>(null)
+// Pénalty en attente du tireur (si pour nous) et du résultat (marqué ou non)
+const pendingPenaltyType = ref<EventType | null>(null)
 
 // Durée de la 1ère mi-temps, capturée avant que le chrono ne se remette à zéro (sert au calcul des minutes jouées)
 const firstHalfMinutes = ref<number | null>(null)
@@ -133,9 +136,15 @@ const scoreAway = computed(
 
 // Actions qui s'enregistrent sans tap terrain (le joueur concerné suffit)
 const INSTANT_ACTIONS = new Set<EventType>(['YELLOW_CARD', 'RED_CARD', 'BALL_WON', 'BALL_LOST', 'INTERCEPTION', 'TACKLE'])
+const PENALTY_TYPES = new Set<EventType>(['PENALTY_FOR', 'PENALTY_AGAINST'])
 
 // Tap sur une action — si instantanée, on enregistre directement (ou on demande le joueur si l'effectif est connu)
 function handleActionSelect(action: EventType) {
+  // Toujours à l'arrêt de jeu (pas de tap terrain) : tireur (si pour nous) + résultat
+  if (PENALTY_TYPES.has(action)) {
+    pendingPenaltyType.value = action
+    return
+  }
   if (INSTANT_ACTIONS.has(action)) {
     if (lineupPlayers.value.length === 0) {
       recordEvent(action, null, null, null, null)
@@ -203,6 +212,28 @@ function handlePlayerEventConfirm(playerId: string | null) {
   pendingPlayerEventType.value = null
 }
 
+// Confirmation pénalty : tireur (si pour nous) + résultat. Un pénalty marqué
+// crée en plus, immédiatement, un vrai événement GOAL_FOR/GOAL_AGAINST — le
+// score et les stats de buts (dont le buteur) restent ainsi corrects sans
+// double logique de comptage.
+function handlePenaltyConfirm(data: { scored: boolean; takerId: string | null }) {
+  if (!pendingPenaltyType.value) return
+  const type = pendingPenaltyType.value
+
+  const penaltyEvent = buildEvent(type, null, null, null, null)
+  penaltyEvent.penaltyScored = data.scored
+  if (type === 'PENALTY_FOR') penaltyEvent.scorerId = data.takerId
+  addEventWithFallback(penaltyEvent)
+
+  if (data.scored) {
+    const goalEvent = buildEvent(type === 'PENALTY_FOR' ? 'GOAL_FOR' : 'GOAL_AGAINST', null, null, null, null)
+    if (type === 'PENALTY_FOR') goalEvent.scorerId = data.takerId
+    addEventWithFallback(goalEvent)
+  }
+
+  pendingPenaltyType.value = null
+}
+
 // Confirmation remplacement
 function handleSubstitutionConfirm(data: { playerInId: string; playerOutId: string }) {
   showSubstitutionModal.value = false
@@ -236,6 +267,7 @@ function buildEvent(
     playerId: null,
     playerInId: null,
     playerOutId: null,
+    penaltyScored: null,
     createdBy: authStore.user?.id ?? '',
     createdAt: new Date().toISOString(),
   }
@@ -386,6 +418,16 @@ async function handleFinishMatch() {
       :players="lineupPlayers"
       @confirm="handlePlayerEventConfirm"
       @cancel="pendingPlayerEventType = null"
+    />
+
+    <!-- Modal pénalty : tireur (si pour nous) + résultat -->
+    <PenaltyModal
+      v-if="pendingPenaltyType"
+      :type="pendingPenaltyType"
+      :minute="timer.currentMinute.value"
+      :players="lineupPlayers"
+      @confirm="handlePenaltyConfirm"
+      @cancel="pendingPenaltyType = null"
     />
 
     <!-- Modal remplacement -->

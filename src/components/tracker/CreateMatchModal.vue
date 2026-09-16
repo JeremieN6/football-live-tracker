@@ -38,11 +38,31 @@ const selectableTeams = computed(() => {
   return teamsStore.teams.filter((t) => clubsStore.hasTeamAccess(t))
 })
 
+// Place le nom du club dans le champ Domicile/Extérieur correspondant au
+// côté choisi ("à domicile" = à gauche, "à l'extérieur" = à droite) — le
+// coach n'a alors plus qu'à taper le nom de l'adversaire dans l'autre champ.
+// Ne touche que le champ qui contenait déjà le nom du club (jamais le nom
+// de l'adversaire potentiellement déjà saisi de l'autre côté).
+function applyClubSide() {
+  const clubName = clubsStore.club?.name
+  if (!clubName) return
+  if (isHome.value) {
+    homeTeam.value = clubName
+    if (awayTeam.value === clubName) awayTeam.value = ''
+  } else {
+    awayTeam.value = clubName
+    if (homeTeam.value === clubName) homeTeam.value = ''
+  }
+}
+
+watch(isHome, applyClubSide)
+
 onMounted(async () => {
   try {
     const club = await clubsStore.ensureClub()
     await Promise.all([teamsStore.fetchTeams(club.id), playersStore.fetchPlayers()])
     if (selectableTeams.value.length === 1) teamId.value = selectableTeams.value[0].id
+    applyClubSide()
   } catch (err: unknown) {
     errorMessage.value = extractErrorMessage(err, 'Erreur lors du chargement du club.')
   }

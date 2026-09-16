@@ -17,6 +17,7 @@ const clubsStore = useClubsStore()
 const teamsStore = useTeamsStore()
 
 const showCreateModal = ref(false)
+const editingMatch = ref<Match | null>(null)
 const activeTeam = ref<string>('ALL')
 const openId = ref<string | null>(null)
 const confirmDeleteId = ref<string | null>(null)
@@ -236,6 +237,13 @@ async function handleDelete(id: string) {
               Détails
             </button>
             <button
+              v-if="clubsStore.canWrite"
+              class="flex-none h-10 px-3 rounded-[9px] border border-line text-ink-secondary text-xs font-medium hover:text-ink hover:bg-surface transition-colors"
+              @click.stop="editingMatch = m"
+            >
+              Modifier
+            </button>
+            <button
               v-if="clubsStore.isOwner"
               class="flex-none h-10 px-3 rounded-[9px] border border-line text-ink-secondary hover:text-danger hover:border-danger-line hover:bg-danger-soft transition-colors"
               @click.stop="confirmDeleteId = m.id"
@@ -254,6 +262,7 @@ async function handleDelete(id: string) {
 
     <!-- Modal création match -->
     <CreateMatchModal v-if="showCreateModal" @close="showCreateModal = false" />
+    <CreateMatchModal v-if="editingMatch" :edit-match="editingMatch" @close="editingMatch = null" />
 
     <!-- Confirmation de suppression -->
     <div

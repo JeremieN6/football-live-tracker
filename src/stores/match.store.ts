@@ -166,6 +166,30 @@ export const useMatchStore = defineStore('match', () => {
     if (currentMatch.value?.id === id) Object.assign(currentMatch.value, { scoreHome, scoreAway })
   }
 
+  // Corrige les infos generales d'un match deja cree (date, equipes, competition,
+  // domicile/exterieur) — utile pour une erreur de saisie remarquee apres coup
+  // (ex. mauvaise date), y compris sur un match deja FINISHED.
+  async function updateMatch(
+    id: string,
+    payload: { homeTeam: string; awayTeam: string; competition: string; date: string; isHome: boolean },
+  ) {
+    const { error: sbError } = await supabase
+      .from('matches')
+      .update({
+        home_team: payload.homeTeam,
+        away_team: payload.awayTeam,
+        competition: payload.competition,
+        date: payload.date,
+        is_home: payload.isHome,
+      })
+      .eq('id', id)
+    if (sbError) throw sbError
+
+    const idx = matches.value.findIndex((m) => m.id === id)
+    if (idx !== -1) Object.assign(matches.value[idx], payload)
+    if (currentMatch.value?.id === id) Object.assign(currentMatch.value, payload)
+  }
+
   // Enregistre la formation choisie pour la composition (ex. "4-4-2")
   async function updateFormation(id: string, formation: string) {
     const { error: sbError } = await supabase.from('matches').update({ formation }).eq('id', id)
@@ -207,5 +231,5 @@ export const useMatchStore = defineStore('match', () => {
     if (currentMatch.value?.id === id) currentMatch.value = null
   }
 
-  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatchStatus, finishMatch, updateScore, updateFormation, updateDesignatedTracker, deleteMatch }
+  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatch, updateMatchStatus, finishMatch, updateScore, updateFormation, updateDesignatedTracker, deleteMatch }
 })

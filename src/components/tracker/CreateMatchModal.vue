@@ -8,8 +8,15 @@ import { usePlayersStore } from '@/stores/players.store'
 import { useRouter } from 'vue-router'
 import { fetchEligibleTrackers, type EligibleTracker } from '@/lib/eligibleTrackers'
 import { extractErrorMessage } from '@/lib/errors'
+import type { Match } from '@/types/match.types'
 
+// En mode edition (editMatch fourni), le formulaire corrige les infos generales
+// d'un match deja cree (ex. mauvaise date remarquee apres coup) au lieu d'en
+// creer un nouveau — memes champs, sauf la delegation de tracker (deja geree
+// ailleurs) et la composition (non concernee par une correction de date/equipes).
+const props = defineProps<{ editMatch?: Match | null }>()
 const emit = defineEmits<{ close: [] }>()
+const isEditMode = computed(() => !!props.editMatch)
 
 const matchStore = useMatchStore()
 const clubsStore = useClubsStore()
@@ -44,6 +51,9 @@ const selectableTeams = computed(() => {
 // Ne touche que le champ qui contenait déjà le nom du club (jamais le nom
 // de l'adversaire potentiellement déjà saisi de l'autre côté).
 function applyClubSide() {
+  // Ne jamais toucher les noms d'equipe deja saisis en mode edition (ex. bascule
+  // du toggle domicile/exterieur pour corriger uniquement ce champ)
+  if (isEditMode.value) return
   const clubName = clubsStore.club?.name
   if (!clubName) return
   if (isHome.value) {
@@ -61,6 +71,17 @@ onMounted(async () => {
   try {
     const club = await clubsStore.ensureClub()
     await Promise.all([teamsStore.fetchTeams(club.id), playersStore.fetchPlayers()])
+
+    if (props.editMatch) {
+      homeTeam.value = props.editMatch.homeTeam
+      awayTeam.value = props.editMatch.awayTeam
+      competition.value = props.editMatch.competition
+      date.value = props.editMatch.date.split('T')[0]
+      isHome.value = props.editMatch.isHome
+      teamId.value = props.editMatch.teamId
+      return
+    }
+
     if (selectableTeams.value.length === 1) teamId.value = selectableTeams.value[0].id
     applyClubSide()
   } catch (err: unknown) {
@@ -94,6 +115,18 @@ async function handleSubmit() {
   loading.value = true
 
   try {
+    if (props.editMatch) {
+      await matchStore.updateMatch(props.editMatch.id, {
+        homeTeam: homeTeam.value.trim(),
+        awayTeam: awayTeam.value.trim(),
+        competition: competition.value.trim(),
+        date: date.value,
+        isHome: isHome.value,
+      })
+      emit('close')
+      return
+    }
+
     const match = await matchStore.createMatch({
       homeTeam: homeTeam.value.trim(),
       awayTeam: awayTeam.value.trim(),
@@ -107,7 +140,7 @@ async function handleSubmit() {
     emit('close')
     await router.push({ name: 'lineup', params: { id: match.id } })
   } catch (err: unknown) {
-    errorMessage.value = extractErrorMessage(err, 'Erreur lors de la création.')
+    errorMessage.value = extractErrorMessage(err, props.editMatch ? 'Erreur lors de la modification.' : 'Erreur lors de la création.')
   } finally {
     loading.value = false
   }
@@ -125,7 +158,7 @@ async function handleSubmit() {
 
       <!-- Header -->
       <div class="flex items-center justify-between mb-6">
-        <h2 class="text-lg font-semibold text-ink">Nouveau match</h2>
+        <h2 class="text-lg font-semibold text-ink">{{ isEditMode ? 'Modifier le match' : 'Nouveau match' }}</h2>
         <button class="text-ink-meta hover:text-ink transition-colors p-1" @click="emit('close')">
           <X :size="18" :stroke-width="2" />
         </button>
@@ -134,8 +167,8 @@ async function handleSubmit() {
       <!-- Formulaire -->
       <form class="space-y-4" @submit.prevent="handleSubmit">
 
-        <!-- Équipe du club concernée -->
-        <div v-if="selectableTeams.length > 0" class="space-y-1">
+        <!-- Équipe du club concernée (creation uniquement — pas de reassignation d'equipe en edition) -->
+        <div v-if="!isEditMode && selectableTeams.length > 0" class="space-y-1">
           <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Votre équipe</label>
           <select
             v-model="teamId"
@@ -149,8 +182,8 @@ async function handleSubmit() {
           </select>
         </div>
 
-        <!-- Délégation du live tracking à un joueur pour ce match -->
-        <div v-if="teamId" class="space-y-1">
+        <!-- Délégation du live tracking à un joueur pour ce match (creation uniquement) -->
+        <div v-if="!isEditMode && teamId" class="space-y-1">
           <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Autoriser un joueur à tracker ce match (optionnel)</label>
           <select
             v-model="trackerMemberId"
@@ -265,8 +298,8 @@ async function handleSubmit() {
             :disabled="loading"
             class="flex-1 h-11 rounded-btn bg-brand text-brand-soft text-sm font-semibold hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <span v-if="loading">Création…</span>
-            <span v-else>Démarrer</span>
+            <span v-if="loading">{{ isEditMode ? 'Enregistrement…' : 'Création…' }}</span>
+            <span v-else>{{ isEditMode ? 'Enregistrer' : 'Démarrer' }}</span>
           </button>
         </div>
       </form>

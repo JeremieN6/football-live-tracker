@@ -62,43 +62,23 @@ function playerName(id: string | null): string | null {
 
 const chronology = computed(() => [...eventsStore.events].sort((a, b) => a.minute - b.minute))
 
-const eventTypeLabels: Record<string, string> = {
-  GOAL_FOR: 'But',
-  GOAL_AGAINST: 'But encaissé',
-  SHOT_ON_TARGET: 'Tir cadré',
-  SHOT_OFF_TARGET: 'Tir raté',
-  CHANCE_CLEAR: 'Occasion nette',
-  CORNER_FOR: 'Corner',
-  CORNER_AGAINST: 'Corner concédé',
-  FREE_KICK_FOR: 'Coup franc',
-  FREE_KICK_AGAINST: 'Coup franc concédé',
-  FOUL_SUFFERED: 'Faute subie',
-  FOUL_COMMITTED: 'Faute commise',
-  DANGER_SUFFERED: 'Danger subi',
-  YELLOW_CARD: 'Carton jaune',
-  RED_CARD: 'Carton rouge',
-  SUBSTITUTION: 'Remplacement',
-}
-
 function chronologyLabel(event: MatchEvent): string {
+  const label = eventMeta(event.type).label
   if (event.type === 'GOAL_FOR') {
     const scorer = playerName(event.scorerId)
     const assist = playerName(event.assistId)
     if (scorer && assist) return `But — ${scorer} (passe déc. : ${assist})`
     if (scorer) return `But — ${scorer}`
-    return eventTypeLabels.GOAL_FOR
-  }
-  if (event.type === 'YELLOW_CARD' || event.type === 'RED_CARD') {
-    const player = playerName(event.playerId)
-    return player ? `${eventTypeLabels[event.type]} — ${player}` : eventTypeLabels[event.type]
+    return label
   }
   if (event.type === 'SUBSTITUTION') {
     const playerIn = playerName(event.playerInId)
     const playerOut = playerName(event.playerOutId)
     if (playerIn && playerOut) return `${playerIn} ↔ ${playerOut}`
-    return eventTypeLabels.SUBSTITUTION
+    return label
   }
-  return eventTypeLabels[event.type] ?? event.type
+  const player = playerName(event.playerId)
+  return player ? `${label} — ${player}` : label
 }
 
 function computeStats(events: MatchEvent[]): ReportStats {

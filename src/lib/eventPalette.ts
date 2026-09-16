@@ -11,6 +11,10 @@ import {
   ArrowLeftRight,
   RectangleVertical,
   Hand,
+  ShieldCheck,
+  ShieldX,
+  Footprints,
+  Radar,
 } from 'lucide-vue-next'
 import type { EventType } from '@/types/match.types'
 
@@ -43,6 +47,10 @@ export const EVENT_PALETTE: EventMeta[] = [
   { type: 'CORNER_AGAINST', label: 'Corner concédé', color: '#FB923C', bg: '#431407', border: '#9a3412', group: 'Défensif', icon: CornerDownRight },
   { type: 'FREE_KICK_AGAINST', label: 'Coup franc concédé', color: '#F472B6', bg: '#500724', border: '#9d174d', group: 'Défensif', icon: Flag },
   { type: 'FOUL_COMMITTED', label: 'Faute commise', color: '#FB923C', bg: '#431407', border: '#9a3412', group: 'Défensif', icon: Hand },
+  { type: 'BALL_WON', label: 'Ballon récupéré', color: '#4ADE80', bg: '#052e16', border: '#166534', group: 'Défensif', icon: ShieldCheck },
+  { type: 'INTERCEPTION', label: 'Interception', color: '#38BDF8', bg: '#0c4a6e', border: '#075985', group: 'Défensif', icon: Radar },
+  { type: 'TACKLE', label: 'Tacle', color: '#60A5FA', bg: '#172554', border: '#1e40af', group: 'Défensif', icon: Footprints },
+  { type: 'BALL_LOST', label: 'Ballon perdu', color: '#F87171', bg: '#450a0a', border: '#7f1d1d', group: 'Offensif', icon: ShieldX },
   { type: 'SUBSTITUTION', label: 'Remplacement', color: '#A8A29E', bg: '#1c1917', border: '#78716c', group: 'Défensif', icon: ArrowLeftRight },
   { type: 'YELLOW_CARD', label: 'Carton jaune', color: '#FBBF24', bg: '#451a03', border: '#78716c', group: 'Disciplinaire', icon: RectangleVertical },
   { type: 'RED_CARD', label: 'Carton rouge', color: '#EF4444', bg: '#450a0a', border: '#7f1d1d', group: 'Disciplinaire', icon: RectangleVertical },

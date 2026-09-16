@@ -136,7 +136,7 @@ test('flow create match to report generation', async ({ page }) => {
   await expect(page).toHaveURL(/\/match\/[^/]+$/)
 
   await page.getByRole('button', { name: 'Carton jaune' }).click()
-  // Effectif connu (11 titulaires placés) : la palette ouvre CardPlayerModal
+  // Effectif connu (11 titulaires placés) : la palette ouvre PlayerEventModal
   // pour choisir le joueur sanctionné plutôt que d'enregistrer directement
   // l'événement — "Passer" confirme l'événement sans préciser de joueur.
   await page.getByRole('button', { name: 'Passer' }).click()

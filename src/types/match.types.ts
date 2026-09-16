@@ -15,6 +15,10 @@ export type EventType =
   | 'FREE_KICK_AGAINST'
   | 'FOUL_COMMITTED'
   | 'FOUL_SUFFERED'
+  | 'BALL_WON'
+  | 'BALL_LOST'
+  | 'INTERCEPTION'
+  | 'TACKLE'
   // Disciplinaire / Tactique
   | 'YELLOW_CARD'
   | 'RED_CARD'
@@ -100,6 +104,10 @@ export interface ClubTeam {
   // seule) les matchs/événements/rapports de TOUTES les autres équipes —
   // jamais l'inverse. Voir can_access_team() côté base.
   isFlagship: boolean
+  // Niveau hiérarchique dans le club (1 = équipe la plus haute, 2, 3...).
+  // Null tant que non renseigné — sert à distinguer Promotion/Renfort d'un
+  // joueur qui joue ponctuellement dans une autre équipe du club.
+  level: number | null
   createdAt: string
 }
 

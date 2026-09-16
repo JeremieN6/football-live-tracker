@@ -4,6 +4,13 @@ import { supabase } from '@/services/supabase'
 import type { LineupRole, Match, MatchEvent } from '@/types/match.types'
 import { extractErrorMessage } from '@/lib/errors'
 
+// Un joueur qui joue un match avec une autre équipe du club que la sienne :
+// "PROMOTION" si l'équipe du match a un niveau strictement meilleur (teams.level
+// plus bas) que l'équipe actuelle du joueur, "RENFORT" si elle a un niveau moins
+// bon — ou si l'un des deux niveaux n'est pas renseigné (comportement par défaut,
+// identique à l'ancien badge unique "renfort" avant que les niveaux existent).
+export type CrossTeamStatus = 'PROMOTION' | 'RENFORT' | null
+
 interface MatchAppearance {
   match: Match
   role: LineupRole
@@ -11,10 +18,14 @@ interface MatchAppearance {
   assists: number
   yellowCards: number
   redCards: number
+  shotsAttempted: number
+  ballsWon: number
+  ballsLost: number
+  interceptions: number
+  tackles: number
   enteredAsSub: boolean
   minutesPlayed: number | null
-  // true si ce match appartient à une autre équipe du club que l'équipe actuelle du joueur (renfort/promotion ponctuelle)
-  calledUp: boolean
+  crossTeamStatus: CrossTeamStatus
 }
 
 // Mapping snake_case BDD → camelCase (identique à match.store)
@@ -91,7 +102,11 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchProfile(playerId: string, currentTeamId: string | null) {
+  async function fetchProfile(
+    playerId: string,
+    currentTeamId: string | null,
+    teamLevels: Map<string, number | null> = new Map(),
+  ) {
     loading.value = true
     error.value = null
     appearances.value = []
@@ -134,6 +149,17 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
         .map(({ role, match }) => {
           const matchEvents = allEvents.filter((e) => e.matchId === match.id)
           const { minutes, enteredAsSub } = computeMinutesPlayed(match, role, matchEvents, playerId)
+
+          let crossTeamStatus: CrossTeamStatus = null
+          if (currentTeamId != null && match.teamId != null && match.teamId !== currentTeamId) {
+            const matchLevel = teamLevels.get(match.teamId) ?? null
+            const currentLevel = teamLevels.get(currentTeamId) ?? null
+            crossTeamStatus =
+              matchLevel != null && currentLevel != null && matchLevel !== currentLevel
+                ? matchLevel < currentLevel ? 'PROMOTION' : 'RENFORT'
+                : 'RENFORT'
+          }
+
           return {
             match,
             role,
@@ -141,9 +167,14 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
             assists: matchEvents.filter((e) => e.type === 'GOAL_FOR' && e.assistId === playerId).length,
             yellowCards: matchEvents.filter((e) => e.type === 'YELLOW_CARD' && e.playerId === playerId).length,
             redCards: matchEvents.filter((e) => e.type === 'RED_CARD' && e.playerId === playerId).length,
+            shotsAttempted: matchEvents.filter((e) => (e.type === 'SHOT_ON_TARGET' || e.type === 'SHOT_OFF_TARGET') && e.playerId === playerId).length,
+            ballsWon: matchEvents.filter((e) => e.type === 'BALL_WON' && e.playerId === playerId).length,
+            ballsLost: matchEvents.filter((e) => e.type === 'BALL_LOST' && e.playerId === playerId).length,
+            interceptions: matchEvents.filter((e) => e.type === 'INTERCEPTION' && e.playerId === playerId).length,
+            tackles: matchEvents.filter((e) => e.type === 'TACKLE' && e.playerId === playerId).length,
             enteredAsSub,
             minutesPlayed: minutes,
-            calledUp: currentTeamId != null && match.teamId != null && match.teamId !== currentTeamId,
+            crossTeamStatus,
           }
         })
         .sort((a, b) => b.match.date.localeCompare(a.match.date))
@@ -172,10 +203,16 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
       assists: list.reduce((sum, a) => sum + a.assists, 0),
       yellowCards: list.reduce((sum, a) => sum + a.yellowCards, 0),
       redCards: list.reduce((sum, a) => sum + a.redCards, 0),
+      shotsAttempted: list.reduce((sum, a) => sum + a.shotsAttempted, 0),
+      ballsWon: list.reduce((sum, a) => sum + a.ballsWon, 0),
+      ballsLost: list.reduce((sum, a) => sum + a.ballsLost, 0),
+      interceptions: list.reduce((sum, a) => sum + a.interceptions, 0),
+      tackles: list.reduce((sum, a) => sum + a.tackles, 0),
       totalMinutes,
       averageMinutes: minutesKnown.length > 0 ? Math.round(totalMinutes / minutesKnown.length) : null,
       minutesKnownForAll: minutesKnown.length === played.length,
-      calledUpCount: played.filter((a) => a.calledUp).length,
+      promotionCount: played.filter((a) => a.crossTeamStatus === 'PROMOTION').length,
+      renfortCount: played.filter((a) => a.crossTeamStatus === 'RENFORT').length,
     }
   })
 

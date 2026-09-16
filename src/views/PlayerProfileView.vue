@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import { usePlayersStore } from '@/stores/players.store'
 import { usePlayerProfileStore } from '@/stores/playerProfile.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { useClubsStore } from '@/stores/clubs.store'
+import { positionCategory } from '@/lib/positionCategory'
 import AppHeader from '@/components/AppHeader.vue'
 import ClubCrest from '@/components/ClubCrest.vue'
 import type { Player } from '@/types/match.types'
@@ -29,7 +30,8 @@ onMounted(async () => {
       teamsStore.fetchTeams(club.id),
     ])
     player.value = playersStore.players.find((p) => p.id === playerId) ?? null
-    await profileStore.fetchProfile(playerId, player.value?.teamId ?? null)
+    const teamLevels = new Map(teamsStore.teams.map((t) => [t.id, t.level]))
+    await profileStore.fetchProfile(playerId, player.value?.teamId ?? null, teamLevels)
   } catch {
     // clubsStore.error / profileStore.error portent déjà le message, affiché dans le template
   }
@@ -50,16 +52,42 @@ function statusLabel(role: string, enteredAsSub: boolean): string {
   return 'Banc (non utilisé)'
 }
 
-const statItems = () => [
-  { label: 'Matchs joués', value: profileStore.totals.matchesPlayed },
-  { label: 'Titularisations', value: profileStore.totals.starts },
-  { label: 'Buts', value: profileStore.totals.goals },
-  { label: 'Passes décisives', value: profileStore.totals.assists },
-  { label: 'Cartons jaunes', value: profileStore.totals.yellowCards },
-  { label: 'Cartons rouges', value: profileStore.totals.redCards },
-  { label: 'Entrées en jeu', value: profileStore.totals.subAppearances },
-  { label: 'Banc non utilisé', value: profileStore.totals.unusedBench },
-]
+// Le poste détermine quelles stats sont pertinentes à afficher : pas de "buts"
+// pour un gardien, ballons récupérés/interceptés/perdus + tacles pour les
+// défenseurs/milieux, tirs tentés pour les attaquants (cf. positionCategory.ts).
+// Un poste non reconnu (texte libre imprévu) affiche tout, par prudence.
+const category = computed(() => positionCategory(player.value?.position))
+
+const statItems = computed(() => {
+  const t = profileStore.totals
+  const base = [
+    { label: 'Matchs joués', value: t.matchesPlayed },
+    { label: 'Titularisations', value: t.starts },
+    { label: 'Entrées en jeu', value: t.subAppearances },
+    { label: 'Banc non utilisé', value: t.unusedBench },
+    { label: 'Cartons jaunes', value: t.yellowCards },
+    { label: 'Cartons rouges', value: t.redCards },
+  ]
+  if (category.value === 'GOALKEEPER') return base
+
+  const attacking = [
+    { label: 'Buts', value: t.goals },
+    { label: 'Passes décisives', value: t.assists },
+  ]
+  const forward = [{ label: 'Tirs tentés', value: t.shotsAttempted }]
+  const defensive = [
+    { label: 'Ballons récupérés', value: t.ballsWon },
+    { label: 'Ballons interceptés', value: t.interceptions },
+    { label: 'Ballons perdus', value: t.ballsLost },
+  ]
+  const tackles = [{ label: 'Tacles', value: t.tackles }]
+
+  if (category.value === 'DEFENDER') return [...base, ...attacking, ...defensive, ...tackles]
+  if (category.value === 'MIDFIELDER') return [...base, ...attacking, ...defensive]
+  if (category.value === 'FORWARD') return [...base, ...attacking, ...forward]
+  // Poste inconnu : tout afficher
+  return [...base, ...attacking, ...defensive, ...tackles, ...forward]
+})
 </script>
 
 <template>
@@ -98,7 +126,7 @@ const statItems = () => [
         <!-- Grille de stats globales -->
         <div class="grid grid-cols-2 gap-2 mb-5">
           <div
-            v-for="item in statItems()"
+            v-for="item in statItems"
             :key="item.label"
             class="bg-surface border border-line rounded-card px-3.5 py-3"
           >
@@ -126,11 +154,19 @@ const statItems = () => [
           </p>
         </div>
 
-        <!-- Renforts avec une autre équipe -->
-        <div v-if="profileStore.totals.calledUpCount > 0" class="bg-brand-soft border border-brand-line rounded-card px-4 py-3 mb-5">
-          <p class="text-sm text-brand-ink">
-            Appelé en renfort avec une autre équipe sur {{ profileStore.totals.calledUpCount }} match{{ profileStore.totals.calledUpCount > 1 ? 's' : '' }}
-          </p>
+        <!-- Promotions / renforts avec une autre équipe -->
+        <div
+          v-if="profileStore.totals.promotionCount > 0 || profileStore.totals.renfortCount > 0"
+          class="grid grid-cols-2 gap-2 mb-5"
+        >
+          <div v-if="profileStore.totals.promotionCount > 0" class="bg-brand-soft border border-brand-line rounded-card px-3.5 py-3">
+            <p class="text-[11px] text-ink-meta mb-1">Promotion 💫</p>
+            <p class="font-score text-lg font-bold text-brand-ink">{{ profileStore.totals.promotionCount }}</p>
+          </div>
+          <div v-if="profileStore.totals.renfortCount > 0" class="bg-surface border border-line rounded-card px-3.5 py-3">
+            <p class="text-[11px] text-ink-meta mb-1">Renfort 💪</p>
+            <p class="font-score text-lg font-bold text-ink">{{ profileStore.totals.renfortCount }}</p>
+          </div>
         </div>
 
         <!-- Détail par match -->
@@ -154,7 +190,9 @@ const statItems = () => [
               <p class="text-[11px] text-ink-meta">
                 {{ formatDate(a.match.date) }} · {{ statusLabel(a.role, a.enteredAsSub) }}
                 <span v-if="a.minutesPlayed != null"> · {{ a.minutesPlayed }}'</span>
-                <span v-if="a.calledUp" class="text-brand-ink"> · {{ teamName(a.match.teamId) }}</span>
+                <span v-if="a.crossTeamStatus" class="text-brand-ink">
+                  · {{ teamName(a.match.teamId) }} · {{ a.crossTeamStatus === 'PROMOTION' ? 'Promotion 💫' : 'Renfort 💪' }}
+                </span>
               </p>
             </div>
             <div class="flex items-center gap-2 text-[11px] font-data shrink-0">

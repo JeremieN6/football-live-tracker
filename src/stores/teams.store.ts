@@ -13,6 +13,7 @@ function rowToTeam(row: Record<string, unknown>): ClubTeam {
     category: row.category as string | null,
     formation: row.formation as string | null,
     isFlagship: (row.is_flagship as boolean | null) ?? false,
+    level: (row.level as number | null) ?? null,
     createdAt: row.created_at as string,
   }
 }
@@ -45,6 +46,7 @@ export const useTeamsStore = defineStore('teams', () => {
     division: string | null
     category: string | null
     formation: string | null
+    level: number | null
   }
 
   async function createTeam(clubId: string, payload: TeamPayload): Promise<ClubTeam> {
@@ -56,6 +58,7 @@ export const useTeamsStore = defineStore('teams', () => {
         division: payload.division,
         category: payload.category,
         formation: payload.formation,
+        level: payload.level,
       })
       .select()
       .single()
@@ -73,6 +76,7 @@ export const useTeamsStore = defineStore('teams', () => {
         division: payload.division,
         category: payload.category,
         formation: payload.formation,
+        level: payload.level,
       })
       .eq('id', id)
     if (sbError) throw sbError

@@ -61,7 +61,7 @@ const pitchEvents = computed(() => props.events.filter((e) => e.pitchX !== null 
 
 <template>
   <div
-    class="relative h-[300px] bg-pitch overflow-hidden"
+    class="relative h-full bg-pitch overflow-hidden"
     :class="needsPitchClick ? 'cursor-crosshair' : 'cursor-default'"
     @click="handleClick"
   >

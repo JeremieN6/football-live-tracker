@@ -44,11 +44,8 @@ function label(event: MatchEvent): string {
     if (scorer) return `But — ${scorer}`
     return eventLabel(event.type)
   }
-  if (event.type === 'YELLOW_CARD' || event.type === 'RED_CARD') {
-    const player = playerName(event.playerId)
-    if (player) return `${eventLabel(event.type)} — ${player}`
-    return eventLabel(event.type)
-  }
+  const player = playerName(event.playerId)
+  if (player) return `${eventLabel(event.type)} — ${player}`
   return eventLabel(event.type)
 }
 

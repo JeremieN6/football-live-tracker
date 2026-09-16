@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { X } from 'lucide-vue-next'
+import { eventMeta } from '@/lib/eventPalette'
 import type { EventType, Player } from '@/types/match.types'
 
 const props = defineProps<{
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 }>()
 
 const playerId = ref<string | null>(null)
+const meta = eventMeta(props.type)
 
 function playerLabel(p: Player): string {
   return p.number != null ? `#${p.number} ${p.name}` : p.name
@@ -39,11 +41,8 @@ function handleSkip() {
       <div class="flex items-center justify-between mb-5">
         <div>
           <h2 class="flex items-center gap-2 text-base font-semibold text-ink">
-            <span
-              class="w-[9px] h-[9px] rounded-full"
-              :style="{ background: props.type === 'RED_CARD' ? '#EF4444' : '#FBBF24' }"
-            />
-            {{ props.type === 'RED_CARD' ? 'Carton rouge' : 'Carton jaune' }}
+            <span class="w-[9px] h-[9px] rounded-full" :style="{ background: meta.color }" />
+            {{ meta.label }}
           </h2>
           <p class="text-xs text-ink-meta mt-0.5">Minute {{ props.minute }}'</p>
         </div>

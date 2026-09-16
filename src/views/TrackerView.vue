@@ -18,7 +18,7 @@ import PitchMap from '@/components/tracker/PitchMap.vue'
 import ActionButtons from '@/components/tracker/ActionButtons.vue'
 import SubstitutionModal from '@/components/tracker/SubstitutionModal.vue'
 import GoalDetailsModal from '@/components/tracker/GoalDetailsModal.vue'
-import CardPlayerModal from '@/components/tracker/CardPlayerModal.vue'
+import PlayerEventModal from '@/components/tracker/PlayerEventModal.vue'
 import EventLog from '@/components/tracker/EventLog.vue'
 import type { EventType, MatchEvent, ZoneX, ZoneY } from '@/types/match.types'
 
@@ -43,9 +43,12 @@ const showSubstitutionModal = ref(false)
 const showFinishConfirm = ref(false)
 const finishing = ref(false)
 
-// But / carton en attente de confirmation du joueur concerné
+// But en attente de confirmation buteur/passeur
 const pendingGoalPos = ref<{ pitchX: number; pitchY: number; zoneX: ZoneX; zoneY: ZoneY } | null>(null)
-const pendingCardType = ref<EventType | null>(null)
+// Tir en attente d'attribution à un joueur (après tap terrain)
+const pendingShotEvent = ref<{ type: EventType; pos: { pitchX: number; pitchY: number; zoneX: ZoneX; zoneY: ZoneY } } | null>(null)
+// Carton / ballon récupéré-perdu / interception / tacle en attente du joueur concerné (pas de tap terrain)
+const pendingPlayerEventType = ref<EventType | null>(null)
 
 // Durée de la 1ère mi-temps, capturée avant que le chrono ne se remette à zéro (sert au calcul des minutes jouées)
 const firstHalfMinutes = ref<number | null>(null)
@@ -115,8 +118,8 @@ const scoreAway = computed(
   () => eventsStore.events.filter((e) => e.type === 'GOAL_AGAINST').length,
 )
 
-// Actions qui s'enregistrent sans tap terrain
-const INSTANT_ACTIONS = new Set<EventType>(['YELLOW_CARD', 'RED_CARD'])
+// Actions qui s'enregistrent sans tap terrain (le joueur concerné suffit)
+const INSTANT_ACTIONS = new Set<EventType>(['YELLOW_CARD', 'RED_CARD', 'BALL_WON', 'BALL_LOST', 'INTERCEPTION', 'TACKLE'])
 
 // Tap sur une action — si instantanée, on enregistre directement (ou on demande le joueur si l'effectif est connu)
 function handleActionSelect(action: EventType) {
@@ -124,7 +127,7 @@ function handleActionSelect(action: EventType) {
     if (lineupPlayers.value.length === 0) {
       recordEvent(action, null, null, null, null)
     } else {
-      pendingCardType.value = action
+      pendingPlayerEventType.value = action
     }
     return
   }
@@ -139,11 +142,18 @@ const pitchHint = computed(() =>
   selectedAction.value ? `Tape le terrain — ${eventLabel(selectedAction.value).toLowerCase()}` : '',
 )
 
+const SHOT_TYPES = new Set<EventType>(['SHOT_ON_TARGET', 'SHOT_OFF_TARGET'])
+
 // Tap sur le terrain — enregistre l'événement avec position
 function handlePitchClick(pos: { pitchX: number; pitchY: number; zoneX: ZoneX; zoneY: ZoneY }) {
   if (!selectedAction.value) return
   if (selectedAction.value === 'GOAL_FOR' && lineupPlayers.value.length > 0) {
     pendingGoalPos.value = pos
+    selectedAction.value = null
+    return
+  }
+  if (SHOT_TYPES.has(selectedAction.value) && lineupPlayers.value.length > 0) {
+    pendingShotEvent.value = { type: selectedAction.value, pos }
     selectedAction.value = null
     return
   }
@@ -161,13 +171,23 @@ function handleGoalConfirm(data: { scorerId: string | null; assistId: string | n
   pendingGoalPos.value = null
 }
 
-// Confirmation carton : joueur sanctionné
-function handleCardConfirm(playerId: string | null) {
-  if (!pendingCardType.value) return
-  const event = buildEvent(pendingCardType.value, null, null, null, null)
+// Confirmation tir : joueur tireur éventuel
+function handleShotConfirm(playerId: string | null) {
+  if (!pendingShotEvent.value) return
+  const { type, pos } = pendingShotEvent.value
+  const event = buildEvent(type, pos.pitchX, pos.pitchY, pos.zoneX, pos.zoneY)
   event.playerId = playerId
   addEventWithFallback(event)
-  pendingCardType.value = null
+  pendingShotEvent.value = null
+}
+
+// Confirmation carton / ballon récupéré-perdu / interception / tacle : joueur concerné
+function handlePlayerEventConfirm(playerId: string | null) {
+  if (!pendingPlayerEventType.value) return
+  const event = buildEvent(pendingPlayerEventType.value, null, null, null, null)
+  event.playerId = playerId
+  addEventWithFallback(event)
+  pendingPlayerEventType.value = null
 }
 
 // Confirmation remplacement
@@ -247,71 +267,82 @@ async function handleFinishMatch() {
     </div>
 
     <template v-else>
-      <!-- Zone 1 — score + chrono + contrôles (fixe) -->
-      <MatchTimer
-        :display="timer.display.value"
-        :running="timer.running.value"
-        :half="timer.half.value"
-        :score-home="scoreHome"
-        :score-away="scoreAway"
-        :home-team="matchStore.currentMatch?.homeTeam ?? ''"
-        :away-team="matchStore.currentMatch?.awayTeam ?? ''"
-        :meta="teamMeta"
-        :can-control="canTrack"
-        :added-time-display="timer.addedTimeDisplay.value"
-        @start="timer.start()"
-        @pause="timer.pause()"
-        @switch-half="handleSwitchHalf"
-        @reset="timer.reset()"
-      />
+      <!-- Empilé en mobile (terrain fixe, puis palette/timeline), 2 colonnes des lg
+           (chrono+palette+timeline à gauche, terrain sur toute la hauteur à droite)
+           — même agencement que LineupView.vue. -->
+      <div class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
 
-      <!-- Zone 2 — terrain (fixe, 300px) -->
-      <PitchMap
-        :events="eventsStore.events"
-        :active-action="canTrack ? selectedAction : null"
-        :hint="canTrack ? pitchHint : ''"
-        @pitch-click="handlePitchClick"
-      />
-
-      <!-- Zone 3 — palette d'événements (fixe) -->
-      <ActionButtons
-        v-if="canTrack"
-        :selected-action="selectedAction"
-        @select="handleActionSelect"
-        @deselect="handleActionDeselect"
-        @open-substitution="showSubstitutionModal = true"
-      />
-
-      <!-- Alerte offline -->
-      <div v-if="pendingCount > 0" class="flex-none mx-3 mt-2 px-3 py-2 rounded-input bg-[#451a03] border border-warning/40">
-        <p class="text-xs text-warning">
-          {{ pendingCount }} événement{{ pendingCount > 1 ? 's' : '' }} en attente de synchronisation
-        </p>
-      </div>
-
-      <!-- Zone 4 — timeline (seule zone qui scrolle) -->
-      <div class="flex-1 min-h-0 overflow-y-auto px-3 pt-2.5 pb-3.5">
-        <div class="flex items-baseline justify-between mx-1 mb-2">
-          <span class="text-[13px] font-semibold text-ink">Timeline</span>
-          <span class="font-data text-[11px] text-ink-meta">{{ eventsStore.events.length }} évén.</span>
+        <!-- Terrain -->
+        <div class="flex-none h-[420px] lg:order-2 lg:flex-1 lg:h-auto lg:min-h-0">
+          <PitchMap
+            :events="eventsStore.events"
+            :active-action="canTrack ? selectedAction : null"
+            :hint="canTrack ? pitchHint : ''"
+            @pitch-click="handlePitchClick"
+          />
         </div>
 
-        <EventLog
-          :events="eventsStore.events"
-          :players="lineupPlayers"
-          :read-only="!canTrack"
-          @delete="handleDeleteEvent"
-        />
+        <!-- Colonne chrono + palette + timeline -->
+        <div class="flex-1 min-h-0 flex flex-col lg:order-1 lg:flex-none lg:w-[420px] lg:border-r lg:border-line">
 
-        <!-- Bouton terminer le match -->
-        <button
-          v-if="canTrack"
-          class="w-full h-12 mt-4 rounded-btn border border-line text-ink-secondary text-sm font-medium
-                 hover:border-danger-line hover:text-danger hover:bg-danger-soft transition-colors"
-          @click="showFinishConfirm = true"
-        >
-          Terminer le match
-        </button>
+          <MatchTimer
+            :display="timer.display.value"
+            :running="timer.running.value"
+            :half="timer.half.value"
+            :score-home="scoreHome"
+            :score-away="scoreAway"
+            :home-team="matchStore.currentMatch?.homeTeam ?? ''"
+            :away-team="matchStore.currentMatch?.awayTeam ?? ''"
+            :meta="teamMeta"
+            :can-control="canTrack"
+            :added-time-display="timer.addedTimeDisplay.value"
+            @start="timer.start()"
+            @pause="timer.pause()"
+            @switch-half="handleSwitchHalf"
+            @reset="timer.reset()"
+          />
+
+          <ActionButtons
+            v-if="canTrack"
+            :selected-action="selectedAction"
+            @select="handleActionSelect"
+            @deselect="handleActionDeselect"
+            @open-substitution="showSubstitutionModal = true"
+          />
+
+          <!-- Alerte offline -->
+          <div v-if="pendingCount > 0" class="flex-none mx-3 mt-2 px-3 py-2 rounded-input bg-[#451a03] border border-warning/40">
+            <p class="text-xs text-warning">
+              {{ pendingCount }} événement{{ pendingCount > 1 ? 's' : '' }} en attente de synchronisation
+            </p>
+          </div>
+
+          <!-- Timeline (seule zone qui scrolle) -->
+          <div class="flex-1 min-h-0 overflow-y-auto px-3 pt-2.5 pb-3.5">
+            <div class="flex items-baseline justify-between mx-1 mb-2">
+              <span class="text-[13px] font-semibold text-ink">Timeline</span>
+              <span class="font-data text-[11px] text-ink-meta">{{ eventsStore.events.length }} évén.</span>
+            </div>
+
+            <EventLog
+              :events="eventsStore.events"
+              :players="lineupPlayers"
+              :read-only="!canTrack"
+              @delete="handleDeleteEvent"
+            />
+
+            <!-- Bouton terminer le match -->
+            <button
+              v-if="canTrack"
+              class="w-full h-12 mt-4 rounded-btn border border-line text-ink-secondary text-sm font-medium
+                     hover:border-danger-line hover:text-danger hover:bg-danger-soft transition-colors"
+              @click="showFinishConfirm = true"
+            >
+              Terminer le match
+            </button>
+          </div>
+
+        </div>
       </div>
     </template>
 
@@ -324,14 +355,24 @@ async function handleFinishMatch() {
       @cancel="pendingGoalPos = null"
     />
 
-    <!-- Modal carton : joueur sanctionné -->
-    <CardPlayerModal
-      v-if="pendingCardType"
-      :type="pendingCardType"
+    <!-- Modal tir : joueur tireur éventuel -->
+    <PlayerEventModal
+      v-if="pendingShotEvent"
+      :type="pendingShotEvent.type"
       :minute="timer.currentMinute.value"
       :players="lineupPlayers"
-      @confirm="handleCardConfirm"
-      @cancel="pendingCardType = null"
+      @confirm="handleShotConfirm"
+      @cancel="pendingShotEvent = null"
+    />
+
+    <!-- Modal carton / ballon récupéré-perdu / interception / tacle : joueur concerné -->
+    <PlayerEventModal
+      v-if="pendingPlayerEventType"
+      :type="pendingPlayerEventType"
+      :minute="timer.currentMinute.value"
+      :players="lineupPlayers"
+      @confirm="handlePlayerEventConfirm"
+      @cancel="pendingPlayerEventType = null"
     />
 
     <!-- Modal remplacement -->

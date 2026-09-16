@@ -131,6 +131,54 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
     )
   }
 
+  // Modifie le rôle et/ou les équipes/catégories d'un membre déjà invité.
+  // Jusqu'ici il n'y avait aucun moyen de corriger une invitation ni de retirer
+  // quelqu'un depuis l'interface (removeMember existait mais n'était appelée
+  // nulle part) -- seule une requête SQL manuelle le permettait.
+  async function updateMember(
+    id: string,
+    payload: { role: Exclude<MemberRole, 'OWNER'>; teamIds: string[]; categories: string[] },
+  ) {
+    if (payload.role === 'CATEGORY_MANAGER') {
+      if (payload.categories.length === 0) throw new Error('Sélectionnez au moins une catégorie.')
+    } else if (payload.role !== 'PRESIDENT' && payload.role !== 'DIRIGEANT' && payload.teamIds.length === 0) {
+      throw new Error('Sélectionnez au moins une équipe.')
+    }
+
+    const { error: roleError } = await supabase.from('club_members').update({ role: payload.role }).eq('id', id)
+    if (roleError) throw roleError
+
+    // Remplace intégralement les rattachements plutôt que de calculer un diff :
+    // le volume par membre est trivial (quelques lignes), et ça évite toute
+    // divergence entre l'état local et la BDD en cas d'échec partiel.
+    const { error: deleteTeamsError } = await supabase.from('club_member_teams').delete().eq('member_id', id)
+    if (deleteTeamsError) throw deleteTeamsError
+    const { error: deleteCategoriesError } = await supabase.from('club_member_categories').delete().eq('member_id', id)
+    if (deleteCategoriesError) throw deleteCategoriesError
+
+    if (payload.role === 'CATEGORY_MANAGER') {
+      const { error: categoriesError } = await supabase
+        .from('club_member_categories')
+        .insert(payload.categories.map((category) => ({ member_id: id, category })))
+      if (categoriesError) throw categoriesError
+    } else if (payload.teamIds.length > 0) {
+      const { error: linksError } = await supabase
+        .from('club_member_teams')
+        .insert(payload.teamIds.map((teamId) => ({ member_id: id, team_id: teamId })))
+      if (linksError) throw linksError
+    }
+
+    const idx = members.value.findIndex((m) => m.id === id)
+    if (idx !== -1) {
+      members.value[idx] = {
+        ...members.value[idx],
+        role: payload.role,
+        teamIds: payload.role === 'CATEGORY_MANAGER' ? [] : payload.teamIds,
+        categories: payload.role === 'CATEGORY_MANAGER' ? payload.categories : [],
+      }
+    }
+  }
+
   async function removeMember(id: string) {
     const { error: sbError } = await supabase.from('club_members').delete().eq('id', id)
     if (sbError) throw sbError
@@ -142,5 +190,5 @@ export const useClubMembersStore = defineStore('clubMembers', () => {
     error.value = null
   }
 
-  return { members, loading, error, fetchMembers, inviteMember, removeMember, reset }
+  return { members, loading, error, fetchMembers, inviteMember, updateMember, removeMember, reset }
 })

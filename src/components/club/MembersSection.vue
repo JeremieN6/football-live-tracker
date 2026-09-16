@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Plus, X } from 'lucide-vue-next'
+import { Plus, X, Pencil, Trash2 } from 'lucide-vue-next'
 import { useClubsStore, type MemberRole } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
@@ -28,6 +28,7 @@ const roleOptions: { value: InvitableRole; label: string; hint: string }[] = [
 ]
 
 const showForm = ref(false)
+const editingMember = ref<ClubMember | null>(null)
 const email = ref('')
 const role = ref<InvitableRole>('COACH')
 const teamIds = ref<string[]>([])
@@ -35,6 +36,9 @@ const categories = ref<string[]>([])
 const saving = ref(false)
 const errorMessage = ref<string | null>(null)
 const activeFilter = ref<'ALL' | 'STAFF' | 'DIRECTION' | 'OTHER' | 'PENDING'>('ALL')
+const confirmRemove = ref<ClubMember | null>(null)
+const removing = ref(false)
+const removeError = ref<string | null>(null)
 
 const needsTeams = computed(() => role.value !== 'PRESIDENT' && role.value !== 'DIRIGEANT' && role.value !== 'CATEGORY_MANAGER')
 const needsCategories = computed(() => role.value === 'CATEGORY_MANAGER')
@@ -131,10 +135,23 @@ function resetForm() {
   categories.value = []
   errorMessage.value = null
   showForm.value = false
+  editingMember.value = null
+}
+
+// Pré-remplit le formulaire (partagé avec l'invitation) avec les valeurs
+// actuelles du membre -- email non modifiable (identifie le compte), donc
+// masqué en mode édition.
+function openEditForm(member: ClubMember) {
+  editingMember.value = member
+  role.value = member.role as InvitableRole
+  teamIds.value = [...member.teamIds]
+  categories.value = [...member.categories]
+  errorMessage.value = null
+  showForm.value = true
 }
 
 const canSubmit = computed(() => {
-  if (!email.value.trim()) return false
+  if (!editingMember.value && !email.value.trim()) return false
   if (needsCategories.value) return categories.value.length > 0
   if (needsTeams.value) return teamIds.value.length > 0
   return true
@@ -145,17 +162,39 @@ async function handleInvite() {
   errorMessage.value = null
   saving.value = true
   try {
-    await membersStore.inviteMember(clubsStore.club.id, {
-      email: email.value,
-      role: role.value,
-      teamIds: teamIds.value,
-      categories: categories.value,
-    })
+    if (editingMember.value) {
+      await membersStore.updateMember(editingMember.value.id, {
+        role: role.value,
+        teamIds: teamIds.value,
+        categories: categories.value,
+      })
+    } else {
+      await membersStore.inviteMember(clubsStore.club.id, {
+        email: email.value,
+        role: role.value,
+        teamIds: teamIds.value,
+        categories: categories.value,
+      })
+    }
     resetForm()
   } catch (err: unknown) {
-    errorMessage.value = extractErrorMessage(err, 'Erreur lors de l\'invitation.')
+    errorMessage.value = extractErrorMessage(err, editingMember.value ? 'Erreur lors de la modification.' : 'Erreur lors de l\'invitation.')
   } finally {
     saving.value = false
+  }
+}
+
+async function handleRemove() {
+  if (!confirmRemove.value) return
+  removeError.value = null
+  removing.value = true
+  try {
+    await membersStore.removeMember(confirmRemove.value.id)
+    confirmRemove.value = null
+  } catch (err: unknown) {
+    removeError.value = extractErrorMessage(err, 'Erreur lors du retrait du membre.')
+  } finally {
+    removing.value = false
   }
 }
 </script>
@@ -205,6 +244,20 @@ async function handleInvite() {
           <p v-if="playerFor(member.id)?.position" class="mt-0.5 text-[11px] text-ink-meta truncate">{{ playerFor(member.id)!.position }}</p>
         </div>
         <RoleBadge :role="member.role" :pending="member.status === 'PENDING'" />
+        <div v-if="clubsStore.isOwner && member.role !== 'OWNER'" class="flex gap-1.5 mt-0.5">
+          <button
+            class="flex-1 h-8 rounded-[7px] border border-line text-ink-secondary hover:text-ink hover:bg-surface-hover transition-colors flex items-center justify-center"
+            @click="openEditForm(member)"
+          >
+            <Pencil :size="13" :stroke-width="2" />
+          </button>
+          <button
+            class="flex-1 h-8 rounded-[7px] border border-line text-ink-secondary hover:text-danger hover:border-danger-line hover:bg-danger-soft transition-colors flex items-center justify-center"
+            @click="confirmRemove = member"
+          >
+            <Trash2 :size="13" :stroke-width="2" />
+          </button>
+        </div>
       </div>
     </div>
 
@@ -225,14 +278,14 @@ async function handleInvite() {
     >
       <div class="w-full max-w-md bg-surface border border-line rounded-card p-6 max-h-[85vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-6">
-          <h2 class="text-lg font-semibold text-ink">Inviter un membre</h2>
+          <h2 class="text-lg font-semibold text-ink">{{ editingMember ? 'Modifier ' + displayName(editingMember) : 'Inviter un membre' }}</h2>
           <button class="text-ink-meta hover:text-ink transition-colors p-1" @click="resetForm">
             <X :size="18" :stroke-width="2" />
           </button>
         </div>
 
         <form class="space-y-4" @submit.prevent="handleInvite">
-          <div class="space-y-1">
+          <div v-if="!editingMember" class="space-y-1">
             <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Email</label>
             <input
               v-model="email"
@@ -246,6 +299,10 @@ async function handleInvite() {
               Dès que cette personne se connecte avec cette adresse, elle rejoint automatiquement le rôle et les équipes choisis.
             </p>
           </div>
+          <!-- Email non modifiable en édition : c'est lui qui identifie le compte lié. -->
+          <p v-else class="text-xs text-ink-meta bg-surface-sub border border-line rounded-input px-3 py-2">
+            {{ editingMember.invitedEmail ?? 'Compte du propriétaire' }}
+          </p>
           <div class="space-y-1">
             <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Rôle</label>
             <div class="grid grid-cols-2 gap-2">
@@ -322,11 +379,46 @@ async function handleInvite() {
               :disabled="saving || !canSubmit"
               class="flex-1 h-11 rounded-btn bg-brand text-brand-soft text-sm font-semibold hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <span v-if="saving">Envoi…</span>
-              <span v-else>Inviter</span>
+              <span v-if="saving">{{ editingMember ? 'Enregistrement…' : 'Envoi…' }}</span>
+              <span v-else>{{ editingMember ? 'Enregistrer' : 'Inviter' }}</span>
             </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Erreur de retrait -->
+    <p v-if="removeError" class="mt-3 text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2">
+      {{ removeError }}
+    </p>
+
+    <!-- Confirmation de retrait -->
+    <div
+      v-if="confirmRemove"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
+      @click.self="confirmRemove = null"
+    >
+      <div class="w-full max-w-sm bg-surface border border-line rounded-card p-6">
+        <h2 class="text-base font-semibold text-ink mb-1">Retirer {{ displayName(confirmRemove) }} du club ?</h2>
+        <p class="text-sm text-ink-secondary mb-5">
+          Cette personne perdra tout accès à l'application. Cette action est irréversible (une nouvelle invitation sera nécessaire pour la réintégrer).
+        </p>
+        <div class="flex gap-3">
+          <button
+            class="flex-1 h-11 rounded-btn border border-line text-ink-secondary text-sm font-medium hover:text-ink transition-colors"
+            :disabled="removing"
+            @click="confirmRemove = null"
+          >
+            Annuler
+          </button>
+          <button
+            class="flex-1 h-11 rounded-btn bg-danger text-white text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-50"
+            :disabled="removing"
+            @click="handleRemove"
+          >
+            {{ removing ? 'Retrait…' : 'Retirer' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>

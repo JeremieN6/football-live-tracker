@@ -6,7 +6,7 @@ import { usePlayersStore } from '@/stores/players.store'
 import { useLineupStore } from '@/stores/lineup.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { useClubsStore } from '@/stores/clubs.store'
-import { FORMATIONS, ROLE_COLORS, isFormationId, type FormationId } from '@/lib/formations'
+import { FORMATIONS, ROLE_COLORS, isFormationId, type FormationId, type LineupRoleLetter } from '@/lib/formations'
 import { deriveInitials } from '@/lib/displayName'
 import { extractErrorMessage } from '@/lib/errors'
 import { supabase } from '@/services/supabase'
@@ -293,10 +293,32 @@ function tapPlayer(playerId: string) {
   pickedSlot.value = null
 }
 
+// Change de formation sans vider les joueurs déjà placés : ils sont
+// redistribués sur les postes de même ligne (gardien/défenseurs/milieux/
+// attaquants) de la nouvelle formation, dans leur ordre actuel. Si la
+// nouvelle formation a moins de postes sur une ligne (ex. 3 défenseurs au
+// lieu de 4), l'excédent repasse simplement sur le banc plutôt que d'être
+// perdu — jamais idéal à coup sûr, mais évite de tout replacer à la main
+// à chaque changement d'avis sur la formation.
 function selectFormation(id: FormationId) {
-  if (!clubsStore.canWrite) return
+  if (!clubsStore.canWrite || id === formation.value) return
+
+  const byRole: Record<LineupRoleLetter, string[]> = { G: [], D: [], M: [], A: [] }
+  for (const slot of FORMATIONS[formation.value]) {
+    const playerId = assign.value[slot.id]
+    if (playerId) byRole[slot.role].push(playerId)
+  }
+
+  const nextAssign: Record<string, string> = {}
+  const cursor: Record<LineupRoleLetter, number> = { G: 0, D: 0, M: 0, A: 0 }
+  for (const slot of FORMATIONS[id]) {
+    const bucket = byRole[slot.role]
+    const i = cursor[slot.role]++
+    if (i < bucket.length) nextAssign[slot.id] = bucket[i]
+  }
+
   formation.value = id
-  assign.value = {}
+  assign.value = nextAssign
   pickedPlayer.value = null
   pickedSlot.value = null
 }

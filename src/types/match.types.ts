@@ -8,11 +8,13 @@ export type EventType =
   | 'CHANCE_CLEAR'
   | 'CORNER_FOR'
   | 'FREE_KICK_FOR'
+  | 'PENALTY_FOR'
   // Défensif
   | 'GOAL_AGAINST'
   | 'DANGER_SUFFERED'
   | 'CORNER_AGAINST'
   | 'FREE_KICK_AGAINST'
+  | 'PENALTY_AGAINST'
   | 'FOUL_COMMITTED'
   | 'FOUL_SUFFERED'
   | 'BALL_WON'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Users, ChevronDown, Plus, X } from 'lucide-vue-next'
+import { Users, ChevronDown, Plus, X, Star } from 'lucide-vue-next'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
@@ -139,10 +139,25 @@ async function handleDelete(id: string) {
   if (!confirm('Supprimer cette équipe ? Les joueurs et matchs qui y sont rattachés ne seront plus classés dans aucune équipe.')) return
   await teamsStore.deleteTeam(id)
 }
+
+// Équipe fanion : son coach/adjoint voit (lecture seule) toutes les autres
+// équipes, jamais l'inverse — au plus une par club (voir teams.store.ts).
+async function toggleFlagship(team: { id: string; isFlagship: boolean }) {
+  if (!clubsStore.club) return
+  try {
+    await teamsStore.setFlagshipTeam(clubsStore.club.id, team.isFlagship ? null : team.id)
+  } catch (err: unknown) {
+    errorMessage.value = extractErrorMessage(err, "Erreur lors de la désignation de l'équipe fanion.")
+  }
+}
 </script>
 
 <template>
   <div>
+    <p v-if="errorMessage" class="mb-3 text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2">
+      {{ errorMessage }}
+    </p>
+
     <div v-if="teamsStore.loading" class="flex items-center justify-center py-10">
       <div class="w-6 h-6 rounded-full border-2 border-line-strong border-t-ink animate-spin" />
     </div>
@@ -162,8 +177,9 @@ async function handleDelete(id: string) {
             {{ teamShort(team.name) }}
           </span>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold text-ink truncate">
-              {{ team.name }}<span v-if="team.category" class="text-ink-meta font-normal"> · {{ team.category }}</span>
+            <p class="text-sm font-semibold text-ink truncate flex items-center gap-1.5">
+              <Star v-if="team.isFlagship" :size="12" :stroke-width="2" class="flex-none text-brand-ink fill-brand-ink" />
+              <span class="truncate">{{ team.name }}<span v-if="team.category" class="text-ink-meta font-normal"> · {{ team.category }}</span></span>
             </p>
             <div class="flex items-center gap-1.5 mt-[5px]">
               <Users :size="11" :stroke-width="2" class="text-ink-meta flex-none" />
@@ -205,8 +221,11 @@ async function handleDelete(id: string) {
               {{ p.name }}<span v-if="p.position" class="text-ink-meta"> · {{ p.position }}</span>
             </button>
           </div>
-          <div v-if="clubsStore.isOwner" class="flex gap-4 pt-3">
+          <div v-if="clubsStore.isOwner" class="flex flex-wrap gap-4 pt-3">
             <button class="text-xs text-ink-meta hover:text-ink-secondary transition-colors" @click="startEdit(team.id)">Modifier</button>
+            <button class="text-xs text-ink-meta hover:text-ink-secondary transition-colors" @click="toggleFlagship(team)">
+              {{ team.isFlagship ? 'Retirer le statut fanion' : 'Désigner équipe fanion' }}
+            </button>
             <button class="text-xs text-danger hover:opacity-80 transition-colors" @click="handleDelete(team.id)">Supprimer</button>
           </div>
         </div>

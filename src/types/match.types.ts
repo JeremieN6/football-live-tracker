@@ -96,6 +96,10 @@ export interface ClubTeam {
   division: string | null
   category: string | null
   formation: string | null
+  // Équipe fanion : au plus une par club, son coach/adjoint voit (lecture
+  // seule) les matchs/événements/rapports de TOUTES les autres équipes —
+  // jamais l'inverse. Voir can_access_team() côté base.
+  isFlagship: boolean
   createdAt: string
 }
 

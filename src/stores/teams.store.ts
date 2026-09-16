@@ -12,6 +12,7 @@ function rowToTeam(row: Record<string, unknown>): ClubTeam {
     division: row.division as string | null,
     category: row.category as string | null,
     formation: row.formation as string | null,
+    isFlagship: (row.is_flagship as boolean | null) ?? false,
     createdAt: row.created_at as string,
   }
 }
@@ -86,10 +87,30 @@ export const useTeamsStore = defineStore('teams', () => {
     teams.value = teams.value.filter((t) => t.id !== id)
   }
 
+  // Désigne (ou retire) l'équipe fanion du club. Au plus une par club (index
+  // unique partiel côté base) : on retire le flag ailleurs avant de le poser,
+  // plutôt qu'une seule requête, pour ne jamais violer cette contrainte en
+  // cours de route. clubId sert à limiter le "retire partout" au bon club.
+  async function setFlagshipTeam(clubId: string, teamId: string | null) {
+    const { error: clearError } = await supabase
+      .from('teams')
+      .update({ is_flagship: false })
+      .eq('club_id', clubId)
+      .eq('is_flagship', true)
+    if (clearError) throw clearError
+
+    if (teamId) {
+      const { error: setError } = await supabase.from('teams').update({ is_flagship: true }).eq('id', teamId)
+      if (setError) throw setError
+    }
+
+    teams.value = teams.value.map((t) => ({ ...t, isFlagship: t.id === teamId }))
+  }
+
   function reset() {
     teams.value = []
     error.value = null
   }
 
-  return { teams, loading, error, fetchTeams, createTeam, updateTeam, deleteTeam, reset }
+  return { teams, loading, error, fetchTeams, createTeam, updateTeam, deleteTeam, setFlagshipTeam, reset }
 })

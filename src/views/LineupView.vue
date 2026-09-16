@@ -178,6 +178,14 @@ const extraPlayerIds = ref<Set<string>>(new Set())
 const showExtraPicker = ref(false)
 const extraCategory = ref<string | null>(null)
 
+const baseSquad = computed(() => {
+  const teamId = matchStore.currentMatch?.teamId
+  return teamId
+    ? playersStore.players.filter((p) => p.active && p.teamId === teamId)
+    : playersStore.players.filter((p) => p.active && p.teamId && seniorTeamIds.value.has(p.teamId))
+})
+const baseSquadIds = computed(() => new Set(baseSquad.value.map((p) => p.id)))
+
 // Catégories disponibles pour l'ajout ponctuel : toutes sauf celle du vivier
 // de base (celle de l'équipe du match si précisée, sinon "Senior") — déduites
 // des équipes existantes (teams.category reste du texte libre saisi par le coach).
@@ -197,6 +205,13 @@ const extraCategoryPlayers = computed(() => {
   return playersStore.players.filter((p) => p.active && p.teamId && teamIds.has(p.teamId))
 })
 
+// Repli si aucune équipe du club n'a de catégorie renseignée (teams.category) :
+// impossible de proposer un choix par catégorie, donc tous les joueurs du
+// club en dehors du vivier de base sont proposés directement, un par un.
+const otherPlayersFallback = computed(() =>
+  playersStore.players.filter((p) => p.active && p.teamId && !baseSquadIds.value.has(p.id)),
+)
+
 function toggleExtraPlayer(playerId: string) {
   const next = new Set(extraPlayerIds.value)
   if (next.has(playerId)) next.delete(playerId)
@@ -205,14 +220,10 @@ function toggleExtraPlayer(playerId: string) {
 }
 
 const squad = computed(() => {
-  const teamId = matchStore.currentMatch?.teamId
-  const base = teamId
-    ? playersStore.players.filter((p) => p.active && p.teamId === teamId)
-    : playersStore.players.filter((p) => p.active && p.teamId && seniorTeamIds.value.has(p.teamId))
-  if (extraPlayerIds.value.size === 0) return base
-  const baseIds = new Set(base.map((p) => p.id))
-  const extras = playersStore.players.filter((p) => p.active && extraPlayerIds.value.has(p.id) && !baseIds.has(p.id))
-  return [...base, ...extras]
+  if (extraPlayerIds.value.size === 0) return baseSquad.value
+  const ids = baseSquadIds.value
+  const extras = playersStore.players.filter((p) => p.active && extraPlayerIds.value.has(p.id) && !ids.has(p.id))
+  return [...baseSquad.value, ...extras]
 })
 
 const slots = computed(() => FORMATIONS[formation.value])
@@ -474,31 +485,67 @@ function handleViewOnly() {
       </button>
 
       <div v-if="showExtraPicker" class="mt-2 space-y-2">
-        <select
-          v-model="extraCategory"
-          class="w-full h-9 px-2.5 rounded-input bg-surface-sub border border-line text-ink
-                 text-[13px] outline-none focus:border-brand transition-colors [color-scheme:dark]"
-        >
-          <option :value="null">Choisir une catégorie…</option>
-          <option v-for="c in otherCategories" :key="c" :value="c">{{ c }}</option>
-        </select>
-        <p v-if="extraCategory && extraCategoryPlayers.length === 0" class="text-[11.5px] text-ink-meta">
-          Aucun joueur actif dans cette catégorie.
-        </p>
-        <div v-else-if="extraCategory" class="flex flex-wrap gap-1.5">
-          <button
-            v-for="p in extraCategoryPlayers"
-            :key="p.id"
-            type="button"
-            class="text-[12px] px-2.5 py-1 rounded-full border transition-colors"
-            :class="extraPlayerIds.has(p.id)
-              ? 'bg-brand-soft border-brand-line text-brand-ink'
-              : 'bg-surface-sub border-line text-ink-secondary'"
-            @click="toggleExtraPlayer(p.id)"
+        <template v-if="otherCategories.length > 0">
+          <select
+            v-model="extraCategory"
+            class="w-full h-9 px-2.5 rounded-input bg-surface-sub border border-line text-ink
+                   text-[13px] outline-none focus:border-brand transition-colors [color-scheme:dark]"
           >
-            {{ p.name }}
-          </button>
-        </div>
+            <option :value="null">Choisir une catégorie…</option>
+            <option v-for="c in otherCategories" :key="c" :value="c">{{ c }}</option>
+          </select>
+          <p v-if="extraCategory && extraCategoryPlayers.length === 0" class="text-[11.5px] text-ink-meta">
+            Aucun joueur actif dans cette catégorie.
+          </p>
+          <div v-else-if="extraCategory" class="flex flex-wrap gap-1.5">
+            <button
+              v-for="p in extraCategoryPlayers"
+              :key="p.id"
+              type="button"
+              class="text-[12px] px-2.5 py-1 rounded-full border transition-colors"
+              :class="extraPlayerIds.has(p.id)
+                ? 'bg-brand-soft border-brand-line text-brand-ink'
+                : 'bg-surface-sub border-line text-ink-secondary'"
+              @click="toggleExtraPlayer(p.id)"
+            >
+              {{ p.name }}
+            </button>
+          </div>
+        </template>
+
+        <!-- Repli : aucune équipe n'a de catégorie renseignée, impossible de
+             proposer un tri par catégorie — tous les autres joueurs du club
+             sont listés directement, un par un. -->
+        <template v-else>
+          <p class="text-[11.5px] text-ink-meta leading-relaxed">
+            Aucune catégorie renseignée sur les équipes du club — voici tous les autres joueurs, à cocher un par un.
+            <button
+              type="button"
+              class="text-brand-ink hover:underline"
+              @click="router.push({ name: 'club', query: { tab: 'teams' } })"
+            >
+              Renseigner des catégories (ex. "Senior", "U18") dans Mon club
+            </button>
+            permettra un tri plus précis la prochaine fois.
+          </p>
+          <p v-if="otherPlayersFallback.length === 0" class="text-[11.5px] text-ink-meta">
+            Aucun autre joueur disponible dans le club.
+          </p>
+          <div v-else class="flex flex-wrap gap-1.5">
+            <button
+              v-for="p in otherPlayersFallback"
+              :key="p.id"
+              type="button"
+              class="text-[12px] px-2.5 py-1 rounded-full border transition-colors"
+              :class="extraPlayerIds.has(p.id)
+                ? 'bg-brand-soft border-brand-line text-brand-ink'
+                : 'bg-surface-sub border-line text-ink-secondary'"
+              @click="toggleExtraPlayer(p.id)"
+            >
+              {{ p.name }}
+            </button>
+          </div>
+        </template>
       </div>
     </div>
 

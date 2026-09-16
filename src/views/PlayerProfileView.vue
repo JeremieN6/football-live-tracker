@@ -7,6 +7,7 @@ import { usePlayerProfileStore } from '@/stores/playerProfile.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { positionCategory } from '@/lib/positionCategory'
+import { divisionRank } from '@/lib/divisions'
 import AppHeader from '@/components/AppHeader.vue'
 import ClubCrest from '@/components/ClubCrest.vue'
 import type { Player } from '@/types/match.types'
@@ -30,7 +31,7 @@ onMounted(async () => {
       teamsStore.fetchTeams(club.id),
     ])
     player.value = playersStore.players.find((p) => p.id === playerId) ?? null
-    const teamLevels = new Map(teamsStore.teams.map((t) => [t.id, t.level]))
+    const teamLevels = new Map(teamsStore.teams.map((t) => [t.id, divisionRank(t.division)]))
     await profileStore.fetchProfile(playerId, player.value?.teamId ?? null, teamLevels)
   } catch {
     // clubsStore.error / profileStore.error portent déjà le message, affiché dans le template

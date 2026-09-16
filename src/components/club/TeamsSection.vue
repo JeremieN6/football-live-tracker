@@ -7,6 +7,7 @@ import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useMatchStore } from '@/stores/match.store'
 import { extractErrorMessage } from '@/lib/errors'
+import { DIVISION_GROUPS } from '@/lib/divisions'
 
 const router = useRouter()
 const clubsStore = useClubsStore()
@@ -18,7 +19,6 @@ const name = ref('')
 const division = ref('')
 const category = ref('')
 const formation = ref('')
-const level = ref('')
 const editingId = ref<string | null>(null)
 const showForm = ref(false)
 const saving = ref(false)
@@ -99,7 +99,6 @@ function startEdit(id: string) {
   division.value = team.division ?? ''
   category.value = team.category ?? ''
   formation.value = team.formation ?? ''
-  level.value = team.level != null ? String(team.level) : ''
   showForm.value = true
 }
 
@@ -109,7 +108,6 @@ function resetForm() {
   division.value = ''
   category.value = ''
   formation.value = ''
-  level.value = ''
   errorMessage.value = null
   showForm.value = false
 }
@@ -119,13 +117,11 @@ async function handleSubmit() {
   errorMessage.value = null
   saving.value = true
   try {
-    const trimmedLevel = String(level.value).trim()
     const payload = {
       name: name.value.trim(),
-      division: division.value.trim() || null,
+      division: division.value || null,
       category: category.value.trim() || null,
       formation: formation.value.trim() || null,
-      level: trimmedLevel ? Number(trimmedLevel) : null,
     }
     if (editingId.value) {
       await teamsStore.updateTeam(editingId.value, payload)
@@ -276,14 +272,16 @@ async function toggleFlagship(team: { id: string; isFlagship: boolean }) {
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
               <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Division</label>
-              <input
+              <select
                 v-model="division"
-                type="text"
-                placeholder="Ex: Division 3"
-                maxlength="50"
-                class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
-                       text-sm outline-none focus:border-brand transition-colors"
-              />
+                class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink
+                       text-sm outline-none focus:border-brand transition-colors [color-scheme:dark]"
+              >
+                <option value="">Non renseignée</option>
+                <optgroup v-for="group in DIVISION_GROUPS" :key="group.label" :label="group.label">
+                  <option v-for="d in group.divisions" :key="d" :value="d">{{ d }}</option>
+                </optgroup>
+              </select>
             </div>
             <div class="space-y-1">
               <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Catégorie</label>
@@ -297,32 +295,19 @@ async function toggleFlagship(team: { id: string; isFlagship: boolean }) {
               />
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Formation favorite</label>
-              <input
-                v-model="formation"
-                type="text"
-                placeholder="Ex: 4-4-2, 4-3-3…"
-                maxlength="20"
-                class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
-                       text-sm outline-none focus:border-brand transition-colors"
-              />
-            </div>
-            <div class="space-y-1">
-              <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Niveau (optionnel)</label>
-              <input
-                v-model="level"
-                type="number"
-                min="1"
-                placeholder="1 = équipe la plus haute"
-                class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
-                       text-sm outline-none focus:border-brand transition-colors"
-              />
-            </div>
+          <div class="space-y-1">
+            <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Formation favorite</label>
+            <input
+              v-model="formation"
+              type="text"
+              placeholder="Ex: 4-4-2, 4-3-3…"
+              maxlength="20"
+              class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink placeholder:text-ink-meta
+                     text-sm outline-none focus:border-brand transition-colors"
+            />
           </div>
           <p class="text-[11px] text-ink-meta -mt-2">
-            Le niveau sert à distinguer une promotion d'un renfort quand un joueur joue dans une autre équipe du club.
+            La division sert aussi à distinguer une promotion d'un renfort quand un joueur joue dans une autre équipe du club.
           </p>
 
           <p v-if="errorMessage" class="text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-3 py-2">

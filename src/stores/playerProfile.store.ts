@@ -5,10 +5,11 @@ import type { LineupRole, Match, MatchEvent } from '@/types/match.types'
 import { extractErrorMessage } from '@/lib/errors'
 
 // Un joueur qui joue un match avec une autre équipe du club que la sienne :
-// "PROMOTION" si l'équipe du match a un niveau strictement meilleur (teams.level
-// plus bas) que l'équipe actuelle du joueur, "RENFORT" si elle a un niveau moins
-// bon — ou si l'un des deux niveaux n'est pas renseigné (comportement par défaut,
-// identique à l'ancien badge unique "renfort" avant que les niveaux existent).
+// "PROMOTION" si l'équipe du match a un rang de division strictement meilleur
+// (divisionRank() plus élevé, cf. src/lib/divisions.ts) que l'équipe actuelle du
+// joueur, "RENFORT" si elle a un rang moins bon — ou si l'une des deux équipes
+// n'a pas de division renseignée dans la liste fermée (comportement par défaut,
+// identique à l'ancien badge unique "renfort" avant que le classement existe).
 export type CrossTeamStatus = 'PROMOTION' | 'RENFORT' | null
 
 interface MatchAppearance {
@@ -156,7 +157,7 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
             const currentLevel = teamLevels.get(currentTeamId) ?? null
             crossTeamStatus =
               matchLevel != null && currentLevel != null && matchLevel !== currentLevel
-                ? matchLevel < currentLevel ? 'PROMOTION' : 'RENFORT'
+                ? matchLevel > currentLevel ? 'PROMOTION' : 'RENFORT'
                 : 'RENFORT'
           }
 

@@ -124,6 +124,11 @@ export interface Match {
   status: MatchStatus
   scoreHome: number
   scoreAway: number
+  // Match joué à domicile pour l'équipe du club (true par défaut) — distinct de
+  // homeTeam/awayTeam qui restent des libellés texte libre saisis à la création
+  // (ex. nom du sponsor, ville) : "à domicile" ne se devine plus en comparant
+  // homeTeam au nom de l'équipe, c'est un vrai choix fait au moment de créer le match.
+  isHome: boolean
   // Durée de chaque mi-temps (minutes), renseignée à la fin du match — sert au calcul des minutes jouées
   firstHalfMinutes: number | null
   secondHalfMinutes: number | null

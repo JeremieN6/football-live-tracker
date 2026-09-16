@@ -28,6 +28,7 @@ function rowToMatch(row: Record<string, unknown>): Match {
     status: row.status as Match['status'],
     scoreHome: row.score_home as number,
     scoreAway: row.score_away as number,
+    isHome: (row.is_home as boolean | null) ?? true,
     firstHalfMinutes: row.first_half_minutes as number | null,
     secondHalfMinutes: row.second_half_minutes as number | null,
     clubId: row.club_id as string | null,

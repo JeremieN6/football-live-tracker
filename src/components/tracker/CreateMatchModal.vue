@@ -23,6 +23,7 @@ const competition = ref('')
 // Date du jour par défaut
 const date = ref(new Date().toISOString().split('T')[0])
 const teamId = ref<string | null>(null)
+const isHome = ref(true)
 const trackerMemberId = ref<string | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -80,6 +81,7 @@ async function handleSubmit() {
       date: date.value,
       clubId: clubsStore.club.id,
       teamId: teamId.value,
+      isHome: isHome.value,
       designatedTrackerMemberId: trackerMemberId.value,
     })
     emit('close')
@@ -142,6 +144,33 @@ async function handleSubmit() {
           <p class="text-xs text-ink-meta">
             La personne choisie pourra saisir les événements de ce match précis, comme un coach — relis le rapport après le match.
           </p>
+        </div>
+
+        <!-- Domicile/Extérieur : vrai choix explicite plutôt que devine depuis le
+             libellé "Domicile" (qui reste un texte libre, ex. nom de sponsor ou
+             ville, pas forcément le nom exact de l'équipe) — demande explicite
+             de l'utilisateur (16/09/2026), sert au split domicile/extérieur des
+             stats d'équipe (matches.is_home). -->
+        <div class="space-y-1">
+          <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Notre équipe joue</label>
+          <div class="flex gap-1 p-[3px] bg-surface-sub border border-line rounded-input">
+            <button
+              type="button"
+              class="flex-1 h-9 rounded-[7px] text-sm font-medium transition-colors"
+              :class="isHome ? 'bg-brand-soft border border-brand-line text-brand-ink' : 'bg-transparent border border-transparent text-ink-meta'"
+              @click="isHome = true"
+            >
+              À domicile
+            </button>
+            <button
+              type="button"
+              class="flex-1 h-9 rounded-[7px] text-sm font-medium transition-colors"
+              :class="!isHome ? 'bg-brand-soft border border-brand-line text-brand-ink' : 'bg-transparent border border-transparent text-ink-meta'"
+              @click="isHome = false"
+            >
+              À l'extérieur
+            </button>
+          </div>
         </div>
 
         <!-- Équipes (adversaire) -->

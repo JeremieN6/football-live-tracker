@@ -15,6 +15,7 @@ function rowToMatch(row: Record<string, unknown>): Match {
     status: row.status as MatchStatus,
     scoreHome: row.score_home as number,
     scoreAway: row.score_away as number,
+    isHome: (row.is_home as boolean | null) ?? true,
     firstHalfMinutes: row.first_half_minutes as number | null,
     secondHalfMinutes: row.second_half_minutes as number | null,
     clubId: row.club_id as string | null,
@@ -80,6 +81,7 @@ export const useMatchStore = defineStore('match', () => {
     date: string
     clubId: string
     teamId: string | null
+    isHome?: boolean
     designatedTrackerMemberId?: string | null
   }): Promise<Match> {
     const { data: userData } = await supabase.auth.getUser()
@@ -94,6 +96,7 @@ export const useMatchStore = defineStore('match', () => {
         date: payload.date,
         club_id: payload.clubId,
         team_id: payload.teamId,
+        is_home: payload.isHome ?? true,
         designated_tracker_member_id: payload.designatedTrackerMemberId ?? null,
         created_by: userData.user.id,
       })

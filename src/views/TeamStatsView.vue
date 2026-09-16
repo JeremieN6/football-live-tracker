@@ -7,7 +7,6 @@ import { useTeamsStore } from '@/stores/teams.store'
 import { useMatchStore } from '@/stores/match.store'
 import { outcomeFor } from '@/lib/matchBadges'
 import AppHeader from '@/components/AppHeader.vue'
-import type { Match } from '@/types/match.types'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,15 +78,6 @@ interface Summary {
   awayPlayed: number
 }
 
-// homeTeam/awayTeam sont des libellés texte libre (pas de vraie notion domicile/extérieur
-// dans le modèle) — on ne peut donc pas fiabiliser un split domicile/extérieur à partir de
-// ces champs. matches n'a pas non plus de colonne booléenne "à domicile" : ce split est
-// approximé en comparant home_team au nom réel de l'équipe du club (cas le plus courant).
-function isHomeMatch(m: Match): boolean {
-  if (!team.value) return true
-  return m.homeTeam.trim().toLowerCase() === team.value.name.trim().toLowerCase()
-}
-
 const summary = computed<Summary>(() => {
   const s: Summary = { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, homeWins: 0, homePlayed: 0, awayWins: 0, awayPlayed: 0 }
   for (const m of finishedMatches.value) {
@@ -99,7 +89,7 @@ const summary = computed<Summary>(() => {
     else if (outcome === 'N') s.draws++
     else s.losses++
 
-    if (isHomeMatch(m)) {
+    if (m.isHome) {
       s.homePlayed++
       if (outcome === 'V') s.homeWins++
     } else {

@@ -6,6 +6,7 @@ import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { supabase } from '@/services/supabase'
 import { extractErrorMessage } from '@/lib/errors'
+import type { Player } from '@/types/match.types'
 
 // Onboarding d'un joueur qui vient de se connecter (lien magique) : le
 // compte est déjà relié au club via club_members (invitation par email),
@@ -26,6 +27,21 @@ const showCreateForm = ref(false)
 const name = ref('')
 const position = ref('')
 const number = ref('')
+
+// Aucune preuve d'identité n'existe entre le compte qui se connecte et la
+// fiche joueur choisie (le lien d'invitation ne porte que l'email/l'équipe,
+// pas un joueur précis) — un simple récapitulatif avant confirmation évite
+// qu'un clic distrait relie le compte au mauvais coéquipier.
+const pendingClaim = ref<Player | null>(null)
+
+function firstName(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0]
+}
+
+function playerDetail(p: Player): string {
+  const parts = [p.position, p.number != null ? `#${p.number}` : null].filter(Boolean)
+  return parts.length > 0 ? ` (${parts.join(', ')})` : ''
+}
 
 onMounted(async () => {
   try {
@@ -50,11 +66,12 @@ const teamName = computed(() => {
   return teamsStore.teams.find((t) => t.id === id)?.name ?? null
 })
 
-async function claim(playerId: string) {
+async function confirmClaim() {
+  if (!pendingClaim.value) return
   errorMessage.value = null
   saving.value = true
   try {
-    const { error } = await supabase.rpc('claim_player_profile', { target_player_id: playerId })
+    const { error } = await supabase.rpc('claim_player_profile', { target_player_id: pendingClaim.value.id })
     if (error) throw error
     clubsStore.markPlayerProfileClaimed()
     router.push({ name: 'home' })
@@ -62,6 +79,7 @@ async function claim(playerId: string) {
     errorMessage.value = extractErrorMessage(err, 'Erreur lors de la liaison du profil.')
   } finally {
     saving.value = false
+    pendingClaim.value = null
   }
 }
 
@@ -105,7 +123,7 @@ async function handleCreate() {
             :key="p.id"
             :disabled="saving"
             class="w-full flex items-center justify-between gap-2 px-3.5 py-3 rounded-card bg-surface border border-line hover:border-line-strong hover:bg-surface-hover transition-colors text-left disabled:opacity-50"
-            @click="claim(p.id)"
+            @click="pendingClaim = p"
           >
             <span class="text-sm text-ink font-medium">{{ p.name }}</span>
             <span class="text-xs text-ink-meta">{{ p.position || '—' }}<span v-if="p.number != null"> · #{{ p.number }}</span></span>
@@ -176,6 +194,42 @@ async function handleCreate() {
       <p v-if="errorMessage" class="mt-4 text-[13px] text-danger bg-danger-soft border border-danger-line rounded-input px-2.5 py-2 text-center">
         {{ errorMessage }}
       </p>
+    </div>
+
+    <!-- Confirmation avant liaison : aucune autre verification n'existe entre le
+         compte connecte et le joueur choisi, ce recap evite de se lier a la
+         mauvaise fiche par erreur de clic. -->
+    <div
+      v-if="pendingClaim"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
+      @click.self="pendingClaim = null"
+    >
+      <div class="w-full max-w-sm bg-surface border border-line rounded-card p-6">
+        <h2 class="text-base font-semibold text-ink mb-1">
+          Salut {{ firstName(pendingClaim.name) }}, c'est bien toi ?
+        </h2>
+        <p class="text-sm text-ink-secondary mb-5">
+          Tu es sur le point de lier ton compte à la fiche
+          <span class="text-ink font-medium">{{ pendingClaim.name }}</span>{{ playerDetail(pendingClaim) }}.
+          Tu ne pourras plus le faire toi-même ensuite — si ce n'est pas toi, choisis une autre fiche.
+        </p>
+        <div class="flex gap-3">
+          <button
+            class="flex-1 h-11 rounded-btn border border-line text-ink-secondary text-sm font-medium hover:text-ink transition-colors"
+            :disabled="saving"
+            @click="pendingClaim = null"
+          >
+            Ce n'est pas moi
+          </button>
+          <button
+            :disabled="saving"
+            class="flex-1 h-11 rounded-btn bg-brand text-brand-soft text-sm font-semibold hover:bg-brand-hover disabled:opacity-50 transition-colors"
+            @click="confirmClaim"
+          >
+            {{ saving ? 'Liaison…' : "Oui, c'est moi" }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>

@@ -151,29 +151,42 @@ async function setTracker(memberId: string | null) {
 // l'équipe du match est soit sur le terrain, soit sur le banc (cf. maquette
 // Lineup). Un joueur écarté du match doit être archivé dans l'effectif.
 //
-// Quand le match est rattaché à une équipe précise (championnat), le vivier
-// reste exactement l'effectif de cette équipe, comme avant. Quand aucune
-// équipe n'est précisée (ex. match amical créé sans équipe exacte), le vivier
-// par défaut n'est plus TOUT le club (un U18 se retrouvait mélangé aux
-// seniors) mais le groupe Senior (teams.category contenant "senior") — les
-// joueurs d'une autre catégorie doivent être ajoutés explicitement via le
-// panneau "Inclure d'autres joueurs" ci-dessous.
+// Vivier de base : l'effectif de l'équipe du match si une équipe est
+// précisée (cas normal), ou le groupe Senior (teams.category contenant
+// "senior") si aucune équipe n'est précisée (ex. match amical créé sans
+// équipe exacte) — plus TOUT le club par défaut, un U18 s'y mélangeait.
+// Dans TOUS les cas (équipe précisée ou non), le panneau "Inclure d'autres
+// joueurs" ci-dessous permet d'ajouter ponctuellement des joueurs d'une
+// autre catégorie que celle du vivier de base — un amical d'Équipe Première
+// reste un match ou l'on peut vouloir monter un U18, pas seulement un match
+// sans équipe rattachée.
 const SENIOR_CATEGORY = /s[ée]nior/i
 
 const seniorTeamIds = computed(
   () => new Set(teamsStore.teams.filter((t) => SENIOR_CATEGORY.test(t.category ?? '')).map((t) => t.id)),
 )
 
+// Catégorie de l'équipe du match (si une équipe est précisée) — sert à
+// l'exclure de la liste des "autres catégories" proposées à l'ajout.
+const matchTeamCategory = computed(() => {
+  const teamId = matchStore.currentMatch?.teamId
+  if (!teamId) return null
+  return teamsStore.teams.find((t) => t.id === teamId)?.category ?? null
+})
+
 const extraPlayerIds = ref<Set<string>>(new Set())
 const showExtraPicker = ref(false)
 const extraCategory = ref<string | null>(null)
 
-// Catégories disponibles pour l'ajout ponctuel : toutes sauf "Senior", déduites
+// Catégories disponibles pour l'ajout ponctuel : toutes sauf celle du vivier
+// de base (celle de l'équipe du match si précisée, sinon "Senior") — déduites
 // des équipes existantes (teams.category reste du texte libre saisi par le coach).
 const otherCategories = computed(() => {
   const cats = new Set<string>()
   for (const t of teamsStore.teams) {
-    if (t.category && !SENIOR_CATEGORY.test(t.category)) cats.add(t.category)
+    if (!t.category) continue
+    if (matchTeamCategory.value ? t.category === matchTeamCategory.value : SENIOR_CATEGORY.test(t.category)) continue
+    cats.add(t.category)
   }
   return [...cats].sort()
 })
@@ -193,10 +206,13 @@ function toggleExtraPlayer(playerId: string) {
 
 const squad = computed(() => {
   const teamId = matchStore.currentMatch?.teamId
-  if (teamId) return playersStore.players.filter((p) => p.active && p.teamId === teamId)
-  return playersStore.players.filter(
-    (p) => p.active && p.teamId && (seniorTeamIds.value.has(p.teamId) || extraPlayerIds.value.has(p.id)),
-  )
+  const base = teamId
+    ? playersStore.players.filter((p) => p.active && p.teamId === teamId)
+    : playersStore.players.filter((p) => p.active && p.teamId && seniorTeamIds.value.has(p.teamId))
+  if (extraPlayerIds.value.size === 0) return base
+  const baseIds = new Set(base.map((p) => p.id))
+  const extras = playersStore.players.filter((p) => p.active && extraPlayerIds.value.has(p.id) && !baseIds.has(p.id))
+  return [...base, ...extras]
 })
 
 const slots = computed(() => FORMATIONS[formation.value])
@@ -445,10 +461,10 @@ function handleViewOnly() {
       <span class="font-data text-[11px]" :class="complete ? 'text-brand-ink' : 'text-ink-meta'">{{ filledCount }}/11 placés</span>
     </div>
 
-    <!-- Ajout ponctuel de joueurs d'une autre catégorie — uniquement pertinent
-         quand le match n'est pas rattaché à une équipe précise (le vivier par
-         défaut est alors le groupe Senior, pas tout le club). -->
-    <div v-if="clubsStore.canWrite && !matchStore.currentMatch?.teamId" class="flex-none px-4 pt-2 pb-1 border-b border-line">
+    <!-- Ajout ponctuel de joueurs d'une autre catégorie que celle du vivier de
+         base — disponible que le match soit rattaché à une équipe précise
+         (ex. Équipe Première pour un amical) ou non (groupe Senior par défaut). -->
+    <div v-if="clubsStore.canWrite" class="flex-none px-4 pt-2 pb-1 border-b border-line">
       <button
         type="button"
         class="text-[12px] text-ink-secondary hover:text-ink transition-colors"

@@ -98,6 +98,19 @@ onMounted(async () => {
     lineupStore.fetchLineup(matchId),
   ])
   if (clubsStore.club) await teamsStore.fetchTeams(clubsStore.club.id)
+
+  // Impossible de tracker un match sans les 11 titulaires placés — jusqu'ici
+  // accessible en navigant directement ici (ex. bouton "retour" du navigateur
+  // depuis une autre page), sans aucun message ni moyen de revenir compléter
+  // la composition. Ne s'applique qu'à qui peut agir sur cette composition
+  // (canWrite/tracker désigné) : un lecteur seul garde l'accès direct existant
+  // ("Voir le match" depuis LineupView, même avant composition complète).
+  const startersPlaced = lineupStore.entries.filter((e) => e.role === 'STARTER').length
+  if (canTrack.value && startersPlaced < 11) {
+    router.replace({ name: 'lineup', params: { id: matchId }, query: { incomplete: '1' } })
+    return
+  }
+
   // Passe le match en LIVE si PENDING (uniquement si on a le droit de tracker ce match)
   if (canTrack.value && matchStore.currentMatch?.status === 'PENDING') {
     await matchStore.updateMatchStatus(matchId, 'LIVE')

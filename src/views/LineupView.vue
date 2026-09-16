@@ -23,6 +23,11 @@ const clubsStore = useClubsStore()
 
 const matchId = route.params.id as string
 
+// Redirigé ici depuis TrackerView.vue faute de composition complète (11
+// titulaires placés) — affiche un rappel explicite plutôt que de laisser
+// deviner pourquoi on atterrit sur cette page.
+const redirectedIncomplete = route.query.incomplete === '1'
+
 const formation = ref<FormationId>('4-4-2')
 // slotId -> playerId
 const assign = ref<Record<string, string>>({})
@@ -374,6 +379,13 @@ function handleViewOnly() {
           {{ f }}
         </button>
       </div>
+    </div>
+
+    <!-- Redirigé depuis le Tracker faute de composition complète -->
+    <div v-if="redirectedIncomplete" class="flex-none mx-4 mt-2.5 px-3 py-2 rounded-input bg-brand-soft border border-brand-line">
+      <p class="text-[12.5px] text-brand-ink leading-snug">
+        Il manque des titulaires — place les 11 avant de suivre ce match en direct.
+      </p>
     </div>
 
     <!-- Tracker delegue : desormais modifiable ici, pas seulement a la creation

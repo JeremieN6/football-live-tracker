@@ -127,21 +127,43 @@ export const useMatchStore = defineStore('match', () => {
   }
 
   // Termine un match en enregistrant la durée de chaque mi-temps (pour le calcul des minutes jouées)
-  async function finishMatch(id: string, durations: { firstHalfMinutes: number; secondHalfMinutes: number }) {
+  // et le score final (nos buts / buts encaissés, cf. score_home/score_away — jamais persisté avant
+  // le 16/09/2026, ce qui laissait matches.score_home/score_away bloqués à 0 pour tout match terminé).
+  async function finishMatch(
+    id: string,
+    payload: { firstHalfMinutes: number; secondHalfMinutes: number; scoreHome: number; scoreAway: number },
+  ) {
     const { error: sbError } = await supabase
       .from('matches')
       .update({
         status: 'FINISHED',
-        first_half_minutes: durations.firstHalfMinutes,
-        second_half_minutes: durations.secondHalfMinutes,
+        first_half_minutes: payload.firstHalfMinutes,
+        second_half_minutes: payload.secondHalfMinutes,
+        score_home: payload.scoreHome,
+        score_away: payload.scoreAway,
       })
       .eq('id', id)
 
     if (sbError) throw sbError
 
     const idx = matches.value.findIndex((m) => m.id === id)
-    if (idx !== -1) Object.assign(matches.value[idx], { status: 'FINISHED', ...durations })
-    if (currentMatch.value?.id === id) Object.assign(currentMatch.value, { status: 'FINISHED', ...durations })
+    if (idx !== -1) Object.assign(matches.value[idx], { status: 'FINISHED', ...payload })
+    if (currentMatch.value?.id === id) Object.assign(currentMatch.value, { status: 'FINISHED', ...payload })
+  }
+
+  // Réenregistre le score (nos buts / buts encaissés) après une correction d'événements
+  // sur un match déjà FINISHED (ex. un but oublié/mal saisi corrigé après coup) — sans quoi
+  // matches.score_home/score_away resterait figé sur le score au moment du premier "Terminer".
+  async function updateScore(id: string, scoreHome: number, scoreAway: number) {
+    const { error: sbError } = await supabase
+      .from('matches')
+      .update({ score_home: scoreHome, score_away: scoreAway })
+      .eq('id', id)
+    if (sbError) throw sbError
+
+    const idx = matches.value.findIndex((m) => m.id === id)
+    if (idx !== -1) Object.assign(matches.value[idx], { scoreHome, scoreAway })
+    if (currentMatch.value?.id === id) Object.assign(currentMatch.value, { scoreHome, scoreAway })
   }
 
   // Enregistre la formation choisie pour la composition (ex. "4-4-2")
@@ -185,5 +207,5 @@ export const useMatchStore = defineStore('match', () => {
     if (currentMatch.value?.id === id) currentMatch.value = null
   }
 
-  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatchStatus, finishMatch, updateFormation, updateDesignatedTracker, deleteMatch }
+  return { matches, currentMatch, loading, error, fetchMatches, fetchMatch, createMatch, updateMatchStatus, finishMatch, updateScore, updateFormation, updateDesignatedTracker, deleteMatch }
 })

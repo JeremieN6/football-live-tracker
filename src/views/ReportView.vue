@@ -8,6 +8,8 @@ import { useReportStore } from '@/stores/report.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { useLineupStore } from '@/stores/lineup.store'
 import { eventMeta } from '@/lib/eventPalette'
+import { displayScore } from '@/lib/matchBadges'
+import { useClubsStore } from '@/stores/clubs.store'
 import AppHeader from '@/components/AppHeader.vue'
 import type { ReportStats } from '@/stores/report.store'
 import type { MatchEvent } from '@/types/match.types'
@@ -17,6 +19,7 @@ const router = useRouter()
 const matchStore = useMatchStore()
 const eventsStore = useEventsStore()
 const reportStore = useReportStore()
+const clubsStore = useClubsStore()
 const playersStore = usePlayersStore()
 const lineupStore = useLineupStore()
 
@@ -108,6 +111,11 @@ function computeStats(events: MatchEvent[]): ReportStats {
 
 const scoreHome = computed(() => eventsStore.events.filter((e) => e.type === 'GOAL_FOR').length)
 const scoreAway = computed(() => eventsStore.events.filter((e) => e.type === 'GOAL_AGAINST').length)
+// Remis dans l'ordre home/away réel (matches.is_home) — scoreHome/scoreAway ci-dessus
+// sont "nos buts"/"buts encaissés", pas littéralement domicile/extérieur.
+const scoreDisplay = computed(() =>
+  displayScore(scoreHome.value, scoreAway.value, matchStore.currentMatch?.isHome ?? true),
+)
 
 const matchDateLabel = computed(() => {
   const date = matchStore.currentMatch?.date
@@ -188,7 +196,7 @@ function exportPdf() {
         class="flex items-center gap-2 overflow-hidden transition-all duration-200"
         :style="{ opacity: scrolled ? 1 : 0, maxWidth: scrolled ? '220px' : '0px' }"
       >
-        <span class="font-score text-sm font-bold tracking-[1px] text-ink whitespace-nowrap">{{ scoreHome }} - {{ scoreAway }}</span>
+        <span class="font-score text-sm font-bold tracking-[1px] text-ink whitespace-nowrap">{{ scoreDisplay.home }} - {{ scoreDisplay.away }}</span>
         <span class="text-[11px] text-ink-meta whitespace-nowrap truncate">{{ matchStore.currentMatch?.homeTeam }} · {{ matchStore.currentMatch?.awayTeam }}</span>
       </div>
       <span class="flex-none text-[11px] font-medium tracking-[.5px] text-brand-ink px-2 py-1 bg-brand-soft border border-brand-line rounded-full">Analyse</span>
@@ -205,7 +213,7 @@ function exportPdf() {
       <div class="px-4 pt-5 pb-[18px] border-b border-line">
         <div class="flex items-center justify-center gap-4">
           <span class="flex-1 text-right text-[13px] font-semibold text-ink truncate">{{ matchStore.currentMatch?.homeTeam }}</span>
-          <span class="font-score text-[40px] font-bold tracking-[2px] text-ink whitespace-nowrap">{{ scoreHome }} - {{ scoreAway }}</span>
+          <span class="font-score text-[40px] font-bold tracking-[2px] text-ink whitespace-nowrap">{{ scoreDisplay.home }} - {{ scoreDisplay.away }}</span>
           <span class="flex-1 text-[13px] font-semibold text-ink-secondary truncate">{{ matchStore.currentMatch?.awayTeam }}</span>
         </div>
         <p class="mt-2.5 text-center text-xs text-ink-meta">
@@ -311,18 +319,20 @@ function exportPdf() {
           </div>
         </div>
 
-        <div v-if="reportStore.report" class="flex flex-col gap-2 mt-5">
+        <div v-if="reportStore.report || clubsStore.canWrite" class="flex flex-col gap-2 mt-5">
           <button
+            v-if="reportStore.report"
             class="h-12 rounded-btn border border-line bg-surface text-ink text-sm font-medium hover:bg-surface-hover transition-colors"
             @click="exportPdf"
           >
             Exporter en PDF
           </button>
           <button
+            v-if="clubsStore.canWrite"
             class="h-12 rounded-btn border border-line bg-transparent text-ink-secondary text-sm font-medium hover:text-ink hover:bg-surface transition-colors"
             @click="openTimeline"
           >
-            Revoir la timeline
+            {{ matchStore.currentMatch?.status === 'FINISHED' ? 'Corriger les événements' : 'Revoir la timeline' }}
           </button>
         </div>
         <p v-if="reportStore.report" class="mt-4 text-center text-[11px] text-ink-disabled leading-[1.6]">

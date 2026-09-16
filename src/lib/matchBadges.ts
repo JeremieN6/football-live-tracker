@@ -21,3 +21,13 @@ export function outcomeFor(scoreHome: number, scoreAway: number): 'V' | 'N' | 'D
   if (scoreHome < scoreAway) return 'D'
   return 'N'
 }
+
+// matches.scoreHome/scoreAway représentent toujours "nos buts"/"buts encaissés"
+// (GOAL_FOR/GOAL_AGAINST), indépendamment de qui est home_team/away_team en texte
+// libre (cf. Decisions Prises 11/09/2026). Les écrans qui affichent le score À
+// CÔTÉ des libellés homeTeam/awayTeam (Tracker, Rapport, liste des matchs) doivent
+// donc reproduire l'ordre home/away réel selon matches.is_home, sous peine
+// d'afficher le score sous le mauvais nom d'équipe quand le club est à l'extérieur.
+export function displayScore(ourGoals: number, conceded: number, isHome: boolean): { home: number; away: number } {
+  return isHome ? { home: ourGoals, away: conceded } : { home: conceded, away: ourGoals }
+}

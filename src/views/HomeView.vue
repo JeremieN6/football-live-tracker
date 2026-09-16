@@ -8,7 +8,7 @@ import { useTeamsStore } from '@/stores/teams.store'
 import { usePlayersStore } from '@/stores/players.store'
 import { deriveInitials } from '@/lib/displayName'
 import { ROLE_BADGES } from '@/lib/roleBadge'
-import { OUTCOME_BADGES, outcomeFor } from '@/lib/matchBadges'
+import { OUTCOME_BADGES, outcomeFor, displayScore } from '@/lib/matchBadges'
 import AppHeader from '@/components/AppHeader.vue'
 import RoleBadge from '@/components/RoleBadge.vue'
 import ClubCrest from '@/components/ClubCrest.vue'
@@ -318,7 +318,7 @@ const clubMeta = computed(() => {
             <p class="text-[12.5px] font-medium text-ink truncate">{{ matchLabel(match) }}</p>
             <p class="mt-0.5 text-[10px] text-ink-meta truncate">{{ teamName(match.teamId) }} · {{ formatDay(match.date) }} {{ formatMonth(match.date) }}</p>
           </div>
-          <span class="font-score text-sm font-bold text-ink">{{ match.scoreHome }} – {{ match.scoreAway }}</span>
+          <span class="font-score text-sm font-bold text-ink">{{ displayScore(match.scoreHome, match.scoreAway, match.isHome).home }} – {{ displayScore(match.scoreHome, match.scoreAway, match.isHome).away }}</span>
           <ChevronRight :size="14" :stroke-width="2" class="flex-none text-ink-disabled" />
         </button>
       </div>

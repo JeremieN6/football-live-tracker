@@ -13,6 +13,7 @@ import { useTimer } from '@/composables/useTimer'
 import { useOfflineQueue } from '@/composables/useOfflineQueue'
 import { useMatchSync } from '@/composables/useMatchSync'
 import { eventLabel } from '@/lib/eventPalette'
+import { displayScore } from '@/lib/matchBadges'
 import MatchTimer from '@/components/tracker/MatchTimer.vue'
 import PitchMap from '@/components/tracker/PitchMap.vue'
 import ActionButtons from '@/components/tracker/ActionButtons.vue'
@@ -56,9 +57,14 @@ const pendingPenaltyType = ref<EventType | null>(null)
 // Durée de la 1ère mi-temps, capturée avant que le chrono ne se remette à zéro (sert au calcul des minutes jouées)
 const firstHalfMinutes = ref<number | null>(null)
 
+// Popup de rappel à la reprise de la 2e mi-temps : les camps changent de côté,
+// à prendre en compte en replaçant les événements sur le terrain.
+const showHalftimeNotice = ref(false)
+
 function handleSwitchHalf() {
   firstHalfMinutes.value = timer.currentMinute.value
   timer.switchHalf()
+  showHalftimeNotice.value = true
 }
 
 // Effectif sélectionné pour ce match, résolu en objets Player
@@ -91,6 +97,14 @@ const canTrack = computed(() => {
   const trackerId = matchStore.currentMatch?.designatedTrackerMemberId
   return !!trackerId && trackerId === clubsStore.membership?.id
 })
+
+// Un match déjà FINISHED reste accessible ici pour corriger des événements mal
+// saisis (ex. score erroné à l'usage) — canTrack ne dépend pas du statut, donc
+// rien ne bloquait déjà cet accès ; ce qui manquait, c'est de garder le score
+// stocké (matches.score_home/score_away) synchronisé avec les corrections, et
+// de ne pas laisser le bouton "Terminer" réécrire les durées de mi-temps sur un
+// match déjà clos (le chrono repart de zéro à chaque montage de cette vue).
+const isFinishedMatch = computed(() => matchStore.currentMatch?.status === 'FINISHED')
 
 onMounted(async () => {
   eventsStore.reset()
@@ -126,13 +140,28 @@ onUnmounted(() => {
   eventsStore.reset()
 })
 
-// Score calculé depuis les événements
+// Score calculé depuis les événements — toujours "nos buts"/"buts encaissés"
+// (GOAL_FOR/GOAL_AGAINST), indépendamment de home/away (cf. matches.score_home/away)
 const scoreHome = computed(
   () => eventsStore.events.filter((e) => e.type === 'GOAL_FOR').length,
 )
 const scoreAway = computed(
   () => eventsStore.events.filter((e) => e.type === 'GOAL_AGAINST').length,
 )
+// Score affiché sous homeTeam/awayTeam : remis dans le bon ordre si le club
+// est à l'extérieur (sinon le score de "nos buts" apparaissait sous le nom de
+// l'adversaire — bug réel qui faisait croire à la victoire du mauvais camp).
+const scoreDisplay = computed(() =>
+  displayScore(scoreHome.value, scoreAway.value, matchStore.currentMatch?.isHome ?? true),
+)
+
+// Persiste le score en base à chaque correction d'événements sur un match déjà
+// terminé (finishMatch ne s'exécute qu'une fois, à la fin du direct).
+async function persistScoreIfCorrecting() {
+  if (isFinishedMatch.value) {
+    await matchStore.updateScore(matchId, scoreHome.value, scoreAway.value)
+  }
+}
 
 // Actions qui s'enregistrent sans tap terrain (le joueur concerné suffit)
 const INSTANT_ACTIONS = new Set<EventType>(['YELLOW_CARD', 'RED_CARD', 'BALL_WON', 'BALL_LOST', 'INTERCEPTION', 'TACKLE'])
@@ -191,6 +220,7 @@ function handleGoalConfirm(data: { scorerId: string | null; assistId: string | n
   event.assistId = data.assistId
   addEventWithFallback(event)
   pendingGoalPos.value = null
+  persistScoreIfCorrecting()
 }
 
 // Confirmation tir : joueur tireur éventuel
@@ -232,6 +262,7 @@ function handlePenaltyConfirm(data: { scored: boolean; takerId: string | null })
   }
 
   pendingPenaltyType.value = null
+  persistScoreIfCorrecting()
 }
 
 // Confirmation remplacement
@@ -286,6 +317,7 @@ function recordEvent(
 
 async function handleDeleteEvent(id: string) {
   await eventsStore.deleteEvent(id)
+  await persistScoreIfCorrecting()
 }
 
 async function handleFinishMatch() {
@@ -294,7 +326,12 @@ async function handleFinishMatch() {
     // Si le match se termine en 1ère mi-temps (jamais basculé), toute la durée est comptée en 1ère mi-temps
     const first = timer.half.value === 1 ? timer.currentMinute.value : (firstHalfMinutes.value ?? 0)
     const second = timer.half.value === 2 ? timer.currentMinute.value : 0
-    await matchStore.finishMatch(matchId, { firstHalfMinutes: first, secondHalfMinutes: second })
+    await matchStore.finishMatch(matchId, {
+      firstHalfMinutes: first,
+      secondHalfMinutes: second,
+      scoreHome: scoreHome.value,
+      scoreAway: scoreAway.value,
+    })
     router.push({ name: 'report', params: { id: matchId } })
   } finally {
     finishing.value = false
@@ -334,8 +371,8 @@ async function handleFinishMatch() {
             :display="timer.display.value"
             :running="timer.running.value"
             :half="timer.half.value"
-            :score-home="scoreHome"
-            :score-away="scoreAway"
+            :score-home="scoreDisplay.home"
+            :score-away="scoreDisplay.away"
             :home-team="matchStore.currentMatch?.homeTeam ?? ''"
             :away-team="matchStore.currentMatch?.awayTeam ?? ''"
             :meta="teamMeta"
@@ -376,9 +413,19 @@ async function handleFinishMatch() {
               @delete="handleDeleteEvent"
             />
 
+            <!-- Match déjà terminé : retour au rapport plutôt que de re-déclencher "Terminer"
+                 (qui réécrirait les durées de mi-temps depuis un chrono reparti à zéro) -->
+            <button
+              v-if="canTrack && isFinishedMatch"
+              class="w-full h-12 mt-4 rounded-btn border border-line text-ink-secondary text-sm font-medium hover:text-ink hover:bg-surface-hover transition-colors"
+              @click="router.push({ name: 'report', params: { id: matchId } })"
+            >
+              Retour au rapport
+            </button>
+
             <!-- Bouton terminer le match -->
             <button
-              v-if="canTrack"
+              v-else-if="canTrack"
               class="w-full h-12 mt-4 rounded-btn border border-line text-ink-secondary text-sm font-medium
                      hover:border-danger-line hover:text-danger hover:bg-danger-soft transition-colors"
               @click="showFinishConfirm = true"
@@ -438,6 +485,27 @@ async function handleFinishMatch() {
       @confirm="handleSubstitutionConfirm"
       @cancel="showSubstitutionModal = false"
     />
+
+    <!-- Rappel changement de camp à la reprise de la 2e mi-temps -->
+    <div
+      v-if="showHalftimeNotice"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-4 sm:pb-0"
+      @click.self="showHalftimeNotice = false"
+    >
+      <div class="w-full max-w-sm bg-surface border border-line rounded-card p-6">
+        <h2 class="text-base font-semibold text-ink mb-1">Les camps ont changé de côté</h2>
+        <p class="text-sm text-ink-secondary mb-5">
+          C'est la mi-temps : les deux équipes ont inversé leur camp sur le terrain. Pense à en tenir compte en
+          plaçant les événements de cette 2e mi-temps.
+        </p>
+        <button
+          class="w-full h-11 rounded-btn bg-brand text-brand-soft text-sm font-semibold hover:bg-brand-hover transition-colors"
+          @click="showHalftimeNotice = false"
+        >
+          Compris
+        </button>
+      </div>
+    </div>
 
     <!-- Confirmation fin de match -->
     <div

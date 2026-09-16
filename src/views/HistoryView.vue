@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useMatchStore } from '@/stores/match.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
-import { MATCH_STATUS_BADGES, outcomeFor } from '@/lib/matchBadges'
+import { MATCH_STATUS_BADGES, outcomeFor, displayScore } from '@/lib/matchBadges'
 import { Trash2 } from 'lucide-vue-next'
 import { extractErrorMessage } from '@/lib/errors'
 import AppHeader from '@/components/AppHeader.vue'
@@ -77,7 +77,9 @@ function toggleOpen(id: string) {
 }
 
 function scoreDisplay(m: Match): string {
-  return m.status === 'PENDING' ? '—' : `${m.scoreHome} – ${m.scoreAway}`
+  if (m.status === 'PENDING') return '—'
+  const d = displayScore(m.scoreHome, m.scoreAway, m.isHome)
+  return `${d.home} – ${d.away}`
 }
 function scoreColorClass(m: Match): string {
   if (m.status === 'FINISHED') return 'text-ink'

@@ -8,6 +8,7 @@ import { usePlayersStore } from '@/stores/players.store'
 import { useRouter } from 'vue-router'
 import { fetchEligibleTrackers, type EligibleTracker } from '@/lib/eligibleTrackers'
 import { extractErrorMessage } from '@/lib/errors'
+import { MATCH_TYPE_LABELS, MATCH_TYPES, type MatchType } from '@/lib/matchType'
 import type { Match } from '@/types/match.types'
 
 // En mode edition (editMatch fourni), le formulaire corrige les infos generales
@@ -27,6 +28,7 @@ const router = useRouter()
 const homeTeam = ref('')
 const awayTeam = ref('')
 const competition = ref('')
+const matchType = ref<MatchType>('CHAMPIONSHIP')
 // Date du jour par défaut
 const date = ref(new Date().toISOString().split('T')[0])
 const teamId = ref<string | null>(null)
@@ -76,6 +78,7 @@ onMounted(async () => {
       homeTeam.value = props.editMatch.homeTeam
       awayTeam.value = props.editMatch.awayTeam
       competition.value = props.editMatch.competition
+      matchType.value = props.editMatch.matchType ?? 'CHAMPIONSHIP'
       date.value = props.editMatch.date.split('T')[0]
       isHome.value = props.editMatch.isHome
       teamId.value = props.editMatch.teamId
@@ -120,6 +123,7 @@ async function handleSubmit() {
         homeTeam: homeTeam.value.trim(),
         awayTeam: awayTeam.value.trim(),
         competition: competition.value.trim(),
+        matchType: matchType.value,
         date: date.value,
         isHome: isHome.value,
       })
@@ -131,6 +135,7 @@ async function handleSubmit() {
       homeTeam: homeTeam.value.trim(),
       awayTeam: awayTeam.value.trim(),
       competition: competition.value.trim(),
+      matchType: matchType.value,
       date: date.value,
       clubId: clubsStore.club.id,
       teamId: teamId.value,
@@ -252,6 +257,19 @@ async function handleSubmit() {
                      text-sm outline-none focus:border-brand transition-colors"
             />
           </div>
+        </div>
+
+        <!-- Type de match : champ ferme (distinct du libellé libre "Compétition"
+             ci-dessous), sert à filtrer les stats équipe/joueur par la suite. -->
+        <div class="space-y-1">
+          <label class="text-[11px] font-medium tracking-[.5px] text-ink-secondary">Type de match</label>
+          <select
+            v-model="matchType"
+            class="w-full h-11 px-3 rounded-input bg-surface-sub border border-line text-ink
+                   text-sm outline-none focus:border-brand transition-colors"
+          >
+            <option v-for="t in MATCH_TYPES" :key="t" :value="t">{{ MATCH_TYPE_LABELS[t] }}</option>
+          </select>
         </div>
 
         <!-- Compétition -->

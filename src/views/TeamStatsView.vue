@@ -5,7 +5,8 @@ import { supabase } from '@/services/supabase'
 import { useClubsStore } from '@/stores/clubs.store'
 import { useTeamsStore } from '@/stores/teams.store'
 import { useMatchStore } from '@/stores/match.store'
-import { outcomeFor } from '@/lib/matchBadges'
+import { outcomeFor, displayScore } from '@/lib/matchBadges'
+import { MATCH_TYPE_FILTER_LABELS, MATCH_TYPES, type MatchTypeFilter } from '@/lib/matchType'
 import AppHeader from '@/components/AppHeader.vue'
 
 const route = useRoute()
@@ -18,13 +19,15 @@ const teamId = route.params.id as string
 const loading = ref(true)
 const errorMessage = ref<string | null>(null)
 
-interface EventCounts {
-  yellowCards: number
-  redCards: number
-  foulsCommitted: number
-  foulsSuffered: number
-}
-const eventCounts = ref<EventCounts>({ yellowCards: 0, redCards: 0, foulsCommitted: 0, foulsSuffered: 0 })
+// Filtre par type de match (championnat/coupe/amical) — s'applique au bilan,
+// au split domicile/exterieur, à la discipline et aux derniers matchs affichés.
+const typeFilter = ref<MatchTypeFilter>('ALL')
+const filterOptions = ['ALL', ...MATCH_TYPES] as const
+
+// Evénements bruts (type + match_id) de TOUS les matchs terminés de l'équipe,
+// récupérés une seule fois au montage — le filtre par type de match ne
+// nécessite donc aucun refetch, juste un recalcul côté client.
+const rawEvents = ref<{ matchId: string; type: string }[]>([])
 
 onMounted(async () => {
   try {
@@ -34,23 +37,14 @@ onMounted(async () => {
       matchStore.fetchMatches(),
     ])
 
-    const matchIds = finishedMatches.value.map((m) => m.id)
+    const matchIds = allFinishedMatches.value.map((m) => m.id)
     if (matchIds.length > 0) {
       const { data, error: sbError } = await supabase
         .from('events')
-        .select('type')
+        .select('type, match_id')
         .in('match_id', matchIds)
       if (sbError) throw sbError
-      const counts: EventCounts = { yellowCards: 0, redCards: 0, foulsCommitted: 0, foulsSuffered: 0 }
-      for (const row of data ?? []) {
-        switch (row.type) {
-          case 'YELLOW_CARD': counts.yellowCards++; break
-          case 'RED_CARD': counts.redCards++; break
-          case 'FOUL_COMMITTED': counts.foulsCommitted++; break
-          case 'FOUL_SUFFERED': counts.foulsSuffered++; break
-        }
-      }
-      eventCounts.value = counts
+      rawEvents.value = (data ?? []).map((row) => ({ matchId: row.match_id as string, type: row.type as string }))
     }
   } catch (err: unknown) {
     errorMessage.value = err instanceof Error ? err.message : 'Erreur lors du chargement des statistiques.'
@@ -61,9 +55,36 @@ onMounted(async () => {
 
 const team = computed(() => teamsStore.teams.find((t) => t.id === teamId) ?? null)
 
-const finishedMatches = computed(() =>
+const allFinishedMatches = computed(() =>
   matchStore.matches.filter((m) => m.teamId === teamId && m.status === 'FINISHED'),
 )
+
+const finishedMatches = computed(() =>
+  typeFilter.value === 'ALL'
+    ? allFinishedMatches.value
+    : allFinishedMatches.value.filter((m) => m.matchType === typeFilter.value),
+)
+
+interface EventCounts {
+  yellowCards: number
+  redCards: number
+  foulsCommitted: number
+  foulsSuffered: number
+}
+const eventCounts = computed<EventCounts>(() => {
+  const matchIds = new Set(finishedMatches.value.map((m) => m.id))
+  const counts: EventCounts = { yellowCards: 0, redCards: 0, foulsCommitted: 0, foulsSuffered: 0 }
+  for (const e of rawEvents.value) {
+    if (!matchIds.has(e.matchId)) continue
+    switch (e.type) {
+      case 'YELLOW_CARD': counts.yellowCards++; break
+      case 'RED_CARD': counts.redCards++; break
+      case 'FOUL_COMMITTED': counts.foulsCommitted++; break
+      case 'FOUL_SUFFERED': counts.foulsSuffered++; break
+    }
+  }
+  return counts
+})
 
 interface Summary {
   played: number
@@ -127,11 +148,25 @@ function formatDate(dateStr: string): string {
         {{ errorMessage }}
       </p>
 
-      <p v-else-if="summary.played === 0" class="text-sm text-ink-meta text-center py-10">
-        Aucun match terminé pour cette équipe pour l'instant.
-      </p>
-
       <template v-else>
+        <!-- Filtre par type de match -->
+        <div v-if="allFinishedMatches.length > 0" class="flex items-center gap-1.5 mb-3 overflow-x-auto [scrollbar-width:none]">
+          <button
+            v-for="opt in filterOptions"
+            :key="opt"
+            class="flex-none h-8 px-3 rounded-full text-xs font-medium whitespace-nowrap border transition-colors"
+            :class="typeFilter === opt ? 'bg-brand-soft border-brand-line text-brand-ink' : 'bg-surface border-line text-ink-secondary'"
+            @click="typeFilter = opt"
+          >
+            {{ MATCH_TYPE_FILTER_LABELS[opt] }}
+          </button>
+        </div>
+
+        <p v-if="summary.played === 0" class="text-sm text-ink-meta text-center py-10">
+          {{ allFinishedMatches.length === 0 ? "Aucun match terminé pour cette équipe pour l'instant." : 'Aucun match pour ce type de match.' }}
+        </p>
+
+        <template v-else>
         <!-- Bilan -->
         <div class="grid grid-cols-3 gap-2 mb-2.5">
           <div class="bg-surface border border-line rounded-card px-3 py-3 text-center">
@@ -189,9 +224,10 @@ function formatDate(dateStr: string): string {
               <p class="text-sm text-ink font-medium truncate">{{ m.homeTeam }} vs {{ m.awayTeam }}</p>
               <p class="text-[11px] text-ink-meta">{{ formatDate(m.date) }}</p>
             </div>
-            <span class="font-score text-sm font-bold text-ink">{{ m.scoreHome }} – {{ m.scoreAway }}</span>
+            <span class="font-score text-sm font-bold text-ink">{{ displayScore(m.scoreHome, m.scoreAway, m.isHome).home }} – {{ displayScore(m.scoreHome, m.scoreAway, m.isHome).away }}</span>
           </button>
         </div>
+        </template>
       </template>
     </main>
   </div>

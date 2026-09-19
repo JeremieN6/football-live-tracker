@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { LineupRole, Match, MatchEvent } from '@/types/match.types'
+import type { MatchType, MatchTypeFilter } from '@/lib/matchType'
 import { extractErrorMessage } from '@/lib/errors'
 
 // Un joueur qui joue un match avec une autre équipe du club que la sienne :
@@ -36,6 +37,7 @@ function rowToMatch(row: Record<string, unknown>): Match {
     homeTeam: row.home_team as string,
     awayTeam: row.away_team as string,
     competition: row.competition as string,
+    matchType: (row.match_type as MatchType | null) ?? null,
     date: row.date as string,
     status: row.status as Match['status'],
     scoreHome: row.score_home as number,
@@ -103,6 +105,9 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
   const appearances = ref<MatchAppearance[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  // Filtre par type de match (championnat/coupe/amical) — s'applique a l'historique
+  // affiche ET aux stats agregees ci-dessous, cote client (donnees deja chargees).
+  const matchTypeFilter = ref<MatchTypeFilter>('ALL')
 
   async function fetchProfile(
     playerId: string,
@@ -187,8 +192,15 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
     }
   }
 
+  // Historique + stats limités au type de match choisi (Tous par défaut)
+  const filteredAppearances = computed(() =>
+    matchTypeFilter.value === 'ALL'
+      ? appearances.value
+      : appearances.value.filter((a) => a.match.matchType === matchTypeFilter.value),
+  )
+
   // N'agrège que les matchs terminés : un match LIVE/PENDING n'a pas de stats définitives
-  const finishedAppearances = computed(() => appearances.value.filter((a) => a.match.status === 'FINISHED'))
+  const finishedAppearances = computed(() => filteredAppearances.value.filter((a) => a.match.status === 'FINISHED'))
 
   const totals = computed(() => {
     const list = finishedAppearances.value
@@ -221,7 +233,8 @@ export const usePlayerProfileStore = defineStore('playerProfile', () => {
   function reset() {
     appearances.value = []
     error.value = null
+    matchTypeFilter.value = 'ALL'
   }
 
-  return { appearances, loading, error, fetchProfile, totals, reset }
+  return { appearances, filteredAppearances, matchTypeFilter, loading, error, fetchProfile, totals, reset }
 })

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { Match, MatchStatus } from '@/types/match.types'
+import type { MatchType } from '@/lib/matchType'
 import { extractErrorMessage } from '@/lib/errors'
 
 // Mapping snake_case BDD → camelCase TypeScript
@@ -11,6 +12,7 @@ function rowToMatch(row: Record<string, unknown>): Match {
     homeTeam: row.home_team as string,
     awayTeam: row.away_team as string,
     competition: row.competition as string,
+    matchType: (row.match_type as MatchType | null) ?? null,
     date: row.date as string,
     status: row.status as MatchStatus,
     scoreHome: row.score_home as number,
@@ -78,6 +80,7 @@ export const useMatchStore = defineStore('match', () => {
     homeTeam: string
     awayTeam: string
     competition: string
+    matchType: MatchType
     date: string
     clubId: string
     teamId: string | null
@@ -93,6 +96,7 @@ export const useMatchStore = defineStore('match', () => {
         home_team: payload.homeTeam,
         away_team: payload.awayTeam,
         competition: payload.competition,
+        match_type: payload.matchType,
         date: payload.date,
         club_id: payload.clubId,
         team_id: payload.teamId,
@@ -171,7 +175,7 @@ export const useMatchStore = defineStore('match', () => {
   // (ex. mauvaise date), y compris sur un match deja FINISHED.
   async function updateMatch(
     id: string,
-    payload: { homeTeam: string; awayTeam: string; competition: string; date: string; isHome: boolean },
+    payload: { homeTeam: string; awayTeam: string; competition: string; matchType: MatchType; date: string; isHome: boolean },
   ) {
     const { error: sbError } = await supabase
       .from('matches')
@@ -179,6 +183,7 @@ export const useMatchStore = defineStore('match', () => {
         home_team: payload.homeTeam,
         away_team: payload.awayTeam,
         competition: payload.competition,
+        match_type: payload.matchType,
         date: payload.date,
         is_home: payload.isHome,
       })

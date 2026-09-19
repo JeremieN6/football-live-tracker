@@ -1,5 +1,7 @@
 // src/types/match.types.ts — Types centralisés du projet
 
+import type { MatchType } from '@/lib/matchType'
+
 export type EventType =
   // Offensif
   | 'GOAL_FOR'
@@ -135,6 +137,10 @@ export interface Match {
   homeTeam: string
   awayTeam: string
   competition: string
+  // Type de match (championnat/coupe/amical) — champ ferme distinct du libelle
+  // libre `competition`, sert a filtrer les stats equipe/joueur. Null pour un
+  // match cree avant l'ajout de ce champ et jamais reclassifie depuis.
+  matchType: MatchType | null
   date: string
   status: MatchStatus
   scoreHome: number

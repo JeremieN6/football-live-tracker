@@ -8,6 +8,7 @@ import { useTeamsStore } from '@/stores/teams.store'
 import { useClubsStore } from '@/stores/clubs.store'
 import { positionCategory } from '@/lib/positionCategory'
 import { divisionRank } from '@/lib/divisions'
+import { MATCH_TYPE_FILTER_LABELS, MATCH_TYPES } from '@/lib/matchType'
 import AppHeader from '@/components/AppHeader.vue'
 import ClubCrest from '@/components/ClubCrest.vue'
 import type { Player } from '@/types/match.types'
@@ -58,6 +59,7 @@ function statusLabel(role: string, enteredAsSub: boolean): string {
 // défenseurs/milieux, tirs tentés pour les attaquants (cf. positionCategory.ts).
 // Un poste non reconnu (texte libre imprévu) affiche tout, par prudence.
 const category = computed(() => positionCategory(player.value?.position))
+const filterOptions = ['ALL', ...MATCH_TYPES] as const
 
 const statItems = computed(() => {
   const t = profileStore.totals
@@ -124,6 +126,19 @@ const statItems = computed(() => {
       </div>
 
       <template v-else>
+        <!-- Filtre par type de match : s'applique aux stats ci-dessous ET à l'historique -->
+        <div class="flex items-center gap-1.5 mb-4 overflow-x-auto [scrollbar-width:none]">
+          <button
+            v-for="opt in filterOptions"
+            :key="opt"
+            class="flex-none h-8 px-3 rounded-full text-xs font-medium whitespace-nowrap border transition-colors"
+            :class="profileStore.matchTypeFilter === opt ? 'bg-brand-soft border-brand-line text-brand-ink' : 'bg-surface border-line text-ink-secondary'"
+            @click="profileStore.matchTypeFilter = opt"
+          >
+            {{ MATCH_TYPE_FILTER_LABELS[opt] }}
+          </button>
+        </div>
+
         <!-- Grille de stats globales -->
         <div class="grid grid-cols-2 gap-2 mb-5">
           <div
@@ -176,10 +191,13 @@ const statItems = computed(() => {
         <p v-if="profileStore.appearances.length === 0" class="text-sm text-ink-meta text-center py-8">
           Ce joueur n'a encore été sélectionné pour aucun match.
         </p>
+        <p v-else-if="profileStore.filteredAppearances.length === 0" class="text-sm text-ink-meta text-center py-8">
+          Aucun match pour ce type de match.
+        </p>
 
         <div v-else class="flex flex-col gap-1.5">
           <button
-            v-for="a in profileStore.appearances"
+            v-for="a in profileStore.filteredAppearances"
             :key="a.match.id"
             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-card bg-surface border border-line hover:bg-surface-hover transition-colors text-left"
             @click="router.push({ name: 'report', params: { id: a.match.id } })"

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { trackAnthropicUsage } from "../_shared/ops-cost.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -262,6 +263,9 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders })
   }
 
+  // Telemetrie de couts (Sassify Ops) : lancee des que la reponse Claude est lue, attendue dans `finally`.
+  let telemetry: Promise<void> = Promise.resolve()
+
   try {
     const { matchId } = await req.json() as { matchId: string }
     if (!matchId) throw new Error("matchId requis")
@@ -411,6 +415,12 @@ Deno.serve(async (req: Request) => {
     const claudeData = await claudeRes.json() as {
       content: Array<{ type: string; text: string }>
     }
+    telemetry = trackAnthropicUsage(
+      { url: Deno.env.get("OPS_URL"), key: Deno.env.get("OPS_INGEST_KEY") },
+      "nrv",
+      claudeData,
+      { feature: "match-report" },
+    )
     const rawText = claudeData.content[0].text
     // Extraire le JSON (Claude peut ajouter du texte autour dans de rares cas)
     const jsonMatch = rawText.match(/\{[\s\S]*\}/)
@@ -455,5 +465,7 @@ Deno.serve(async (req: Request) => {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
+  } finally {
+    await telemetry
   }
 })
